@@ -377,6 +377,23 @@ function connectSSE() {
                         debugLog('[SSE] 更新消息 role:', msgInfo.role);
                         updateMessageElementClass(message);
                     }
+
+                    if (msgInfo.role === 'assistant' && msgInfo.tokens) {
+                        const currentSession = sessions.find(s => s.sessionId === selectedSessionId);
+                        if (currentSession) {
+                            const tokens = msgInfo.tokens;
+
+                            const newUsage = {
+                                total: (tokens.input || 0) + (tokens.output || 0) + (tokens.reasoning || 0) + (tokens.cache?.read || 0),
+                                input: tokens.input || 0,
+                                output: tokens.output || 0,
+                                reasoning: tokens.reasoning || 0
+                            };
+
+                            currentSession.tokenUsage = newUsage;
+                            updateCurrentSessionDisplay();
+                        }
+                    }
                     break;
 
                 case 'session.idle':
