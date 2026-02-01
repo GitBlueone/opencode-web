@@ -72,11 +72,17 @@ function setupSessionsListEvents() {
         const sessionItem = e.target.closest('.session-item');
 
         if (directoryHeader) {
+            e.stopPropagation();
             const directory = directoryHeader.dataset.directory;
             toggleDirectory(directory);
         } else if (sessionItem) {
             const sessionId = sessionItem.dataset.sessionId;
             selectSession(sessionId);
+
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                sidebar.classList.remove('open');
+            }
         }
     });
 }
