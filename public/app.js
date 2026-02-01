@@ -43,6 +43,26 @@ function setupSidebarToggle() {
         }
     });
 
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    document.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, false);
+
+    document.addEventListener('touchend', (e) => {
+        if (window.innerWidth <= 768) {
+            touchEndX = e.changedTouches[0].screenX;
+            const diff = touchEndX - touchStartX;
+
+            if (diff > 50) {
+                sidebar.classList.add('open');
+            } else if (diff < -50) {
+                sidebar.classList.remove('open');
+            }
+        }
+    }, false);
+
     setupSessionsListEvents();
 }
 
