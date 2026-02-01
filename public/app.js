@@ -1031,6 +1031,13 @@ function scrollToBottom() {
     }
 }
 
+function toggleMetaInfo() {
+    const meta = document.getElementById('session-meta');
+    if (meta) {
+        meta.classList.toggle('visible');
+    }
+}
+
 function showLoadingOverlay() {
     const overlay = document.getElementById('loading-overlay');
     if (overlay) {

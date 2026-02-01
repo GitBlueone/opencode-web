@@ -78,6 +78,13 @@
                         <div class="session-title-row">
                             <h2 id="detail-name">会话名称</h2>
                             <span class="session-status-badge" id="detail-status">运行中</span>
+                            <button class="btn btn-icon-only meta-toggle-btn" id="meta-toggle" onclick="toggleMetaInfo()">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                            </button>
                         </div>
                          <div class="session-actions">
                             <button class="btn btn-primary" onclick="compressCurrentSession()" style="margin-right: 8px;">
@@ -97,7 +104,7 @@
                         </div>
                     </div>
 
-                    <div class="session-meta">
+                    <div class="session-meta" id="session-meta">
                         <div class="meta-item">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
