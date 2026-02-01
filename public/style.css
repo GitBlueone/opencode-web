@@ -16,6 +16,7 @@
     --warning-color: #f59e0b;
     --warning-hover: #d97706;
     --bg-color: #ffffff;
+    --bg-secondary: #f3f4f6;
     --sidebar-bg: #f7f7f8;
     --text-primary: #343541;
     --text-secondary: #6e6e80;
@@ -29,6 +30,87 @@
     --sidebar-width: 280px;
     --sidebar-width-collapsed: 60px;
     --navbar-height: 60px;
+
+    --navbar-title-font-size: 1.25rem;
+    --navbar-btn-padding: 0.625rem 1.25rem;
+    --navbar-btn-font-size: 0.9rem;
+    --navbar-btn-text-display: inline;
+    --navbar-btn-svg-margin-right: 0.5rem;
+
+    --content-area-padding: 2rem;
+    --welcome-icon-size: 4rem;
+    --welcome-heading-font-size: 1.75rem;
+
+    --session-title-row-gap: 1rem;
+    --session-title-row-margin-bottom: 1rem;
+    --session-title-row-flex-wrap: nowrap;
+    --session-title-font-size: 1.5rem;
+    --session-title-overflow: visible;
+    --session-title-min-width: auto;
+    --session-actions-order: initial;
+    --session-status-badge-display: inline-flex;
+    --meta-toggle-btn-display: none;
+
+    --session-meta-display: flex;
+    --session-meta-flex-direction: row;
+    --session-meta-gap: 2rem;
+    --session-meta-padding-top: 1rem;
+    --session-meta-background: transparent;
+    --session-meta-border-radius: 0;
+    --session-meta-margin-bottom: 0;
+    --session-meta-visible-display: flex;
+
+    --meta-item-flex-direction: row;
+    --meta-item-align-items: center;
+    --meta-item-gap: 0.5rem;
+    --meta-item-flex: initial;
+    --meta-item-min-width: initial;
+    --meta-item-span-white-space: nowrap;
+    --meta-item-span-word-break: normal;
+    --meta-item-span-overflow-wrap: normal;
+
+    --session-detail-header-padding: 1.5rem;
+    --session-detail-header-flex-shrink: initial;
+
+    --session-detail-height: initial;
+    --session-detail-flex-direction: column;
+    --session-detail-gap: 1.5rem;
+
+    --session-messages-flex: 1;
+    --session-messages-min-height: 400px;
+    --session-messages-max-height: calc(100vh - 400px);
+    --session-messages-height: auto;
+    --session-messages-overflow: hidden;
+    --session-messages-min-height-mobile: auto;
+
+    --messages-content-flex: 1;
+    --messages-content-min-height: 200px;
+    --messages-content-max-height: initial;
+    --messages-content-min-height-mobile: auto;
+
+    --message-input-area-position: relative;
+    --message-input-area-bottom: auto;
+    --message-input-area-left: auto;
+    --message-input-area-right: auto;
+    --message-input-area-background: var(--bg-color);
+    --message-input-area-padding: 1rem 0;
+    --message-input-area-z-index: initial;
+    --message-input-area-box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.05);
+
+    --message-input-container-max-width: 100%;
+
+    --sidebar-open-content-margin-left: 0;
+
+    --session-actions-btn-padding: 0.625rem 1.25rem;
+    --session-actions-btn-span-display: inline;
+    --session-actions-btn-svg-margin-right: 0.5rem;
+    --session-actions-gap: 1rem;
+    --session-actions-btn-primary-background: var(--primary-color);
+    --session-actions-btn-primary-color: white;
+    --session-actions-btn-primary-border: none;
+    --session-actions-btn-danger-background: var(--danger-color);
+    --session-actions-btn-danger-color: white;
+    --session-actions-btn-danger-border: none;
 }
 
 body {
@@ -99,7 +181,7 @@ body {
 }
 
 .navbar-title {
-    font-size: 1.25rem;
+    font-size: var(--navbar-title-font-size);
     font-weight: 600;
     color: var(--text-primary);
 }
@@ -110,14 +192,22 @@ body {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    padding: 0.625rem 1.25rem;
+    padding: var(--navbar-btn-padding);
     border: none;
     border-radius: var(--radius-md);
     font-weight: 500;
-    font-size: 0.9rem;
+    font-size: var(--navbar-btn-font-size);
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
+}
+
+.btn svg {
+    margin-right: var(--navbar-btn-svg-margin-right);
+}
+
+.btn span {
+    display: var(--navbar-btn-text-display);
 }
 
 .btn-large {
@@ -126,8 +216,9 @@ body {
 }
 
 .btn-primary {
-    background: var(--primary-color);
-    color: white;
+    background: var(--session-actions-btn-primary-background);
+    color: var(--session-actions-btn-primary-color);
+    border: var(--session-actions-btn-primary-border);
 }
 
 .btn-primary:hover {
@@ -155,8 +246,9 @@ body {
 }
 
 .btn-danger {
-    background: var(--danger-color);
-    color: white;
+    background: var(--session-actions-btn-danger-background);
+    color: var(--session-actions-btn-danger-color);
+    border: var(--session-actions-btn-danger-border);
 }
 
 .btn-danger:hover {
@@ -485,7 +577,7 @@ body {
 .content-area {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 2rem;
+    padding: var(--content-area-padding);
 }
 
 /* 欢迎状态 */
@@ -499,12 +591,12 @@ body {
 }
 
 .welcome-icon {
-    font-size: 4rem;
+    font-size: var(--welcome-icon-size);
     margin-bottom: 1.5rem;
 }
 
 .welcome-state h2 {
-    font-size: 1.75rem;
+    font-size: var(--welcome-heading-font-size);
     font-weight: 600;
     margin-bottom: 1rem;
     color: var(--text-primary);
@@ -519,8 +611,9 @@ body {
 .session-detail {
     animation: fadeIn 0.3s ease-out;
     display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
+    flex-direction: var(--session-detail-flex-direction);
+    gap: var(--session-detail-gap);
+    height: var(--session-detail-height);
 }
 
 @keyframes fadeIn {
@@ -537,25 +630,28 @@ body {
 .session-detail-header {
     background: var(--sidebar-bg);
     border-radius: var(--radius-lg);
-    padding: 1.5rem;
+    padding: var(--session-detail-header-padding);
+    flex-shrink: var(--session-detail-header-flex-shrink);
 }
 
-    .session-title-row {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 1rem;
-        flex-wrap: wrap;
-    }
+.session-title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--session-title-row-gap);
+    margin-bottom: var(--session-title-row-margin-bottom);
+    flex-wrap: var(--session-title-row-flex-wrap);
+}
 
 .session-title-row h2 {
-    font-size: 1.5rem;
+    font-size: var(--session-title-font-size);
     font-weight: 600;
     flex: 1;
+    overflow: var(--session-title-overflow);
+    min-width: var(--session-title-min-width);
 }
 
 .session-status-badge {
-    display: inline-flex;
+    display: var(--session-status-badge-display);
     align-items: center;
     padding: 0.375rem 0.875rem;
     border-radius: 9999px;
@@ -575,31 +671,56 @@ body {
 }
 
 .session-meta {
-    display: flex;
-    gap: 2rem;
+    display: var(--session-meta-display);
+    gap: var(--session-meta-gap);
     flex-wrap: wrap;
-    padding-top: 1rem;
+    padding-top: var(--session-meta-padding-top);
+    flex-direction: var(--session-meta-flex-direction);
+    background: var(--session-meta-background);
+    border-radius: var(--session-meta-border-radius);
+    margin-bottom: var(--session-meta-margin-bottom);
 }
 
 .meta-item {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    align-items: var(--meta-item-align-items);
+    gap: var(--meta-item-gap);
     font-size: 0.875rem;
     color: var(--text-secondary);
+    flex: var(--meta-item-flex);
+    min-width: var(--meta-item-min-width);
+    flex-direction: var(--meta-item-flex-direction);
+}
+
+.meta-item span {
+    white-space: var(--meta-item-span-white-space);
+    word-break: var(--meta-item-span-word-break);
+    overflow-wrap: var(--meta-item-span-overflow-wrap);
 }
 
 .meta-item svg {
     flex-shrink: 0;
 }
 
-    .session-actions {
-        display: flex;
-        gap: 0.5rem;
-    }
+.session-actions {
+    display: flex;
+    gap: var(--session-actions-gap);
+}
+
+.session-actions .btn {
+    padding: var(--session-actions-btn-padding);
+}
+
+.session-actions .btn span {
+    display: var(--session-actions-btn-span-display);
+}
+
+.session-actions .btn svg {
+    margin-right: var(--session-actions-btn-svg-margin-right) !important;
+}
 
 .meta-toggle-btn {
-    display: none;
+    display: var(--meta-toggle-btn-display);
     padding: 0.5rem;
     background: transparent;
     border: 1px solid var(--border-color);
@@ -617,13 +738,15 @@ body {
 .session-messages {
     background: var(--sidebar-bg);
     border-radius: var(--radius-lg);
-    overflow: hidden;
+    overflow: var(--session-messages-overflow);
     display: flex;
     flex-direction: column;
-    flex: 1;
-    min-height: 400px;
-    max-height: calc(100vh - 400px);
+    flex: var(--session-messages-flex);
+    min-height: var(--session-messages-min-height);
+    max-height: var(--session-messages-max-height);
     position: relative;
+    height: var(--session-messages-height);
+    min-height: var(--session-messages-min-height-mobile);
 }
 
 .messages-header {
@@ -678,12 +801,14 @@ body {
 }
 
 .messages-content {
-    flex: 1;
+    flex: var(--messages-content-flex);
     padding: 1rem;
     overflow-y: auto;
-    min-height: 200px;
+    min-height: var(--messages-content-min-height);
     display: flex;
     flex-direction: column;
+    max-height: var(--messages-content-max-height);
+    min-height: var(--messages-content-min-height-mobile);
 }
 
 .messages-empty {
@@ -1040,14 +1165,20 @@ body {
 }
 
 .message-input-area {
-    background: var(--bg-color);
+    background: var(--message-input-area-background);
     border-top: 1px solid var(--border-color);
-    box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.05);
-    padding: 1rem 0;
+    box-shadow: var(--message-input-area-box-shadow);
+    padding: var(--message-input-area-padding);
+    position: var(--message-input-area-position);
+    bottom: var(--message-input-area-bottom);
+    left: var(--message-input-area-left);
+    right: var(--message-input-area-right);
+    z-index: var(--message-input-area-z-index);
 }
 
 .message-input-container {
     width: 100%;
+    max-width: var(--message-input-container-max-width);
     display: flex;
     align-items: flex-end;
     gap: 0.75rem;
@@ -1120,21 +1251,12 @@ body {
         padding: 0 1rem;
     }
 
-    .navbar-title {
-        font-size: 1.1rem;
-    }
-
-    .navbar-right .btn {
-        padding: 0.5rem 1rem;
-        font-size: 0.85rem;
-    }
-
-    .navbar-right .btn span {
-        display: none;
-    }
-
-    .navbar-right .btn svg {
-        margin-right: 0 !important;
+    :root {
+        --navbar-title-font-size: 1.1rem;
+        --navbar-btn-padding: 0.5rem 1rem;
+        --navbar-btn-font-size: 0.85rem;
+        --navbar-btn-text-display: none;
+        --navbar-btn-svg-margin-right: 0;
     }
 
     .sidebar {
@@ -1160,163 +1282,100 @@ body {
         padding: 1rem 1rem 6rem 1rem;
     }
 
-    .welcome-icon {
-        font-size: 3rem;
+    :root {
+        --welcome-icon-size: 3rem;
+        --welcome-heading-font-size: 1.5rem;
     }
 
-    .welcome-state h2 {
-        font-size: 1.5rem;
+    :root {
+        --session-title-row-gap: 0.5rem;
+        --session-title-row-margin-bottom: 0;
+        --session-title-row-flex-wrap: wrap;
+        --session-title-font-size: 1.1rem;
+        --session-title-overflow: hidden;
+        --session-title-min-width: 0;
+        --session-actions-order: 2;
+        --session-status-badge-display: none;
+        --meta-toggle-btn-display: flex;
     }
 
     .session-title-row {
-        flex-direction: row;
-        align-items: center;
         justify-content: space-between;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-        margin-bottom: 0;
     }
 
-    .session-title-row h2 {
-        font-size: 1.1rem;
-        flex: 1;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        min-width: 0;
-    }
+    :root {
+        --session-meta-display: none;
+        --session-meta-flex-direction: row;
+        --session-meta-gap: 1rem;
+        --session-meta-padding-top: 1rem;
+        --session-meta-background: var(--bg-secondary);
+        --session-meta-border-radius: var(--radius-md);
+        --session-meta-margin-bottom: 1rem;
+        --session-meta-visible-display: flex;
 
-    .session-title-row .session-actions {
-        order: 2;
-    }
-
-    .session-status-badge {
-        display: none;
-    }
-
-    .meta-toggle-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-    }
-
-    .session-meta {
-        display: none;
-        flex-direction: row;
-        gap: 1rem;
-        flex-wrap: wrap;
-        padding: 1rem;
-        background: var(--bg-secondary);
-        border-radius: var(--radius-md);
-        margin-bottom: 1rem;
+        --meta-item-flex-direction: column;
+        --meta-item-align-items: flex-start;
+        --meta-item-gap: 0.25rem;
+        --meta-item-flex: 1 1 calc(50% - 1rem);
+        --meta-item-min-width: 0;
+        --meta-item-span-white-space: normal;
+        --meta-item-span-word-break: break-word;
+        --meta-item-span-overflow-wrap: break-word;
     }
 
     .session-meta.visible {
         display: flex;
     }
 
-    .meta-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.25rem;
-        flex: 1 1 calc(50% - 1rem);
-        min-width: 0;
+    :root {
+        --session-detail-header-padding: 1rem;
+        --session-detail-header-flex-shrink: 0;
     }
 
-    .meta-item span {
-        white-space: normal;
-        word-break: break-word;
-        overflow-wrap: break-word;
-    }
-
-    .session-detail-header {
-        padding: 1rem;
-    }
-
-    .session-messages {
-        min-height: auto;
-        max-height: none;
-        height: auto;
-    }
-
-    .messages-content {
-        min-height: 200px;
-        max-height: 50vh;
-    }
-
-    .session-detail {
-        height: calc(100vh - var(--navbar-height) - 2rem);
+    .session-messages.visible {
         display: flex;
-        flex-direction: column;
-        gap: 1rem;
     }
 
-    .session-detail-header {
-        flex-shrink: 0;
+    :root {
+        --session-detail-height: calc(100vh - var(--navbar-height) - 2rem);
+        --session-detail-gap: 1rem;
+
+        --session-messages-min-height: auto;
+        --session-messages-max-height: none;
+        --session-messages-height: auto;
+        --session-messages-min-height-mobile: 0;
+        --session-messages-flex: 1;
+
+        --messages-content-min-height: 200px;
+        --messages-content-max-height: 50vh;
+        --messages-content-min-height-mobile: 0;
     }
 
-    .session-messages {
-        flex: 1;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
+    :root {
+        --message-input-area-position: fixed;
+        --message-input-area-bottom: 0;
+        --message-input-area-left: 0;
+        --message-input-area-right: 0;
+        --message-input-area-background: var(--bg-color);
+        --message-input-area-padding: 0.75rem 1rem;
+        --message-input-area-z-index: 100;
+        --message-input-area-box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+
+        --message-input-container-max-width: none;
+        --sidebar-open-content-margin-left: 0;
     }
 
-    .messages-content {
-        flex: 1;
-        overflow-y: auto;
-        min-height: 0;
-    }
-
-    .message-input-area {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: var(--bg-color);
-        border-top: 1px solid var(--border-color);
-        box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
-        padding: 0.75rem 1rem;
-        z-index: 100;
-    }
-
-    .message-input-container {
-        max-width: none;
-    }
-
-    body.sidebar-open .content-area {
-        margin-left: 0;
-    }
-
-    .session-actions .btn {
-        padding: 0.5rem;
-    }
-
-    .session-actions .btn span {
-        display: none;
-    }
-
-    .session-actions .btn svg {
-        margin: 0 !important;
-    }
-
-    .session-actions {
-        display: flex;
-        gap: 0.5rem;
-    }
-
-    .session-actions .btn-primary {
-        background: var(--primary-color);
-        color: white;
-        border: none;
-    }
-
-    .session-actions .btn-danger {
-        background: var(--danger-color);
-        color: white;
-        border: none;
+    :root {
+        --session-actions-btn-padding: 0.5rem;
+        --session-actions-btn-span-display: none;
+        --session-actions-btn-svg-margin-right: 0;
+        --session-actions-gap: 0.5rem;
+        --session-actions-btn-primary-background: var(--primary-color);
+        --session-actions-btn-primary-color: white;
+        --session-actions-btn-primary-border: none;
+        --session-actions-btn-danger-background: var(--danger-color);
+        --session-actions-btn-danger-color: white;
+        --session-actions-btn-danger-border: none;
     }
 
     .modal-content {
