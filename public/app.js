@@ -221,6 +221,8 @@ async function selectSession(sessionId) {
     renderSessionsList(sessions);
     updateCurrentSessionDisplay();
 
+    showLoadingOverlay();
+
     await loadMessages();
 
     connectSSE();
@@ -278,6 +280,8 @@ async function loadMessages() {
     } catch (error) {
         showToast('加载消息失败', 'error');
         console.error('Load messages error:', error);
+    } finally {
+        hideLoadingOverlay();
     }
 }
 
@@ -361,6 +365,7 @@ function connectSSE() {
                             info: { role: msgInfo.role, time: msgInfo.time },
                             parts: []
                         };
+
                         messages.push(message);
                         debugLog('[SSE] 创建新消息:', JSON.stringify(message));
                         renderMessageElement(message);
@@ -368,6 +373,7 @@ function connectSSE() {
                     } else if (message.info?.role === null && msgInfo.role) {
                         message.info.role = msgInfo.role;
                         message.info.time = msgInfo.time;
+
                         debugLog('[SSE] 更新消息 role:', msgInfo.role);
                         updateMessageElementClass(message);
                     }
@@ -874,7 +880,6 @@ async function compressCurrentSession() {
     }
 
     try {
-        // 获取会话信息以获取 directory
         const session = sessions.find(s => s.sessionId === selectedSessionId);
         if (!session) {
             console.error('[compressCurrentSession] 找不到会话:', selectedSessionId);
@@ -978,6 +983,20 @@ function scrollToBottom() {
     const container = document.getElementById('messages-content');
     if (container) {
         container.scrollTop = container.scrollHeight;
+    }
+}
+
+function showLoadingOverlay() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+        overlay.style.display = 'flex';
+    }
+}
+
+function hideLoadingOverlay() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
     }
 }
 
