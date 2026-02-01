@@ -1129,6 +1129,7 @@ body {
         z-index: 90;
         transform: translateX(-100%);
         width: var(--sidebar-width);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .sidebar.open {
