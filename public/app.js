@@ -885,6 +885,8 @@ async function createSession(title, directory) {
         renderSessionsList(sessions);
         closeCreateModal();
         showToast('会话已创建', 'success');
+
+        await selectSession(session.sessionId);
     } catch (error) {
         showToast('创建会话失败', 'error');
         console.error('Create session error:', error);
