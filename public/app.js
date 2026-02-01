@@ -261,6 +261,8 @@ async function loadMessages() {
         messages = messagesData;
         renderMessages(messages);
 
+        scrollToBottom();
+
         // 从响应中获取 token 使用情况并更新 sessions 数组
         if (tokenUsage) {
             const sessionIndex = sessions.findIndex(s => s.sessionId === selectedSessionId);
@@ -342,6 +344,7 @@ function connectSSE() {
                             }
                         }
                         appendOrUpdateMessagePart(part);
+                        scrollToBottom();
                     }
                     break;
 
@@ -361,6 +364,7 @@ function connectSSE() {
                         messages.push(message);
                         debugLog('[SSE] 创建新消息:', JSON.stringify(message));
                         renderMessageElement(message);
+                        scrollToBottom();
                     } else if (message.info?.role === null && msgInfo.role) {
                         message.info.role = msgInfo.role;
                         message.info.time = msgInfo.time;
@@ -458,8 +462,6 @@ function renderMessages(messagesData, animate = false) {
             </div>
         `;
     }).join('');
-
-    scrollToBottom(animate);
 }
 
 function renderMessageElement(message) {
@@ -501,8 +503,6 @@ function renderMessageElement(message) {
 
             renderPartContent(partElement, part);
         });
-
-    scrollToBottom(false);
 }
 
 function updateMessageElementClass(message) {
@@ -553,7 +553,6 @@ function appendOrUpdateMessagePart(part) {
     }
 
     renderPartContent(partElement, part);
-    scrollToBottom(false);
 }
 
 function renderPartContent(partElement, part) {
@@ -565,7 +564,7 @@ function renderPartContent(partElement, part) {
         case 'reasoning':
             partElement.className = 'part-reasoning';
             partElement.innerHTML = `
-                <details class="part-reasoning">
+                <details class="part-reasoning" open>
                     <summary>💭 思考过程</summary>
                     <div class="reasoning-content">${escapeHtml(part.text)}</div>
                 </details>
@@ -596,21 +595,6 @@ function renderPartContent(partElement, part) {
         default:
             break;
     }
-}
-
-function scrollToBottom(animate = false) {
-    requestAnimationFrame(() => {
-        const container = document.getElementById('messages-content');
-        if (container) {
-            container.scrollTop = container.scrollHeight;
-
-            if (animate) {
-                setTimeout(() => {
-                    container.scrollTop = container.scrollHeight;
-                }, 350);
-            }
-        }
-    });
 }
 
 function updateCurrentSessionDisplay() {
@@ -988,6 +972,13 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function scrollToBottom() {
+    const container = document.getElementById('messages-content');
+    if (container) {
+        container.scrollTop = container.scrollHeight;
+    }
 }
 
 document.addEventListener('visibilitychange', () => {

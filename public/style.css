@@ -478,7 +478,7 @@ body {
 /* 主内容区域 */
 .main-content {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: hidden;
     background: var(--bg-color);
 }
 
@@ -606,6 +606,7 @@ body {
     flex-direction: column;
     flex: 1;
     min-height: 400px;
+    max-height: calc(100vh - 400px);
 }
 
 .messages-header {
