@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SSE 测试</title>
+</head>
+<body>
+    <h1>SSE 连接测试</h1>
+    <div id="log"></div>
+
+    <script>
+        const sessionId = 'ses_3ead158c0ffezX4OKZRziqqZsZ';
+        let eventSource = null;
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.textContent = new Date().toLocaleTimeString() + ' - ' + msg;
+            document.getElementById('log').appendChild(div);
+        }
+
+        function connectSSE() {
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            const url = `/api/sessions/${sessionId}/events`;
+            log(`正在连接到: ${url}`);
+            eventSource = new EventSource(url);
+
+            eventSource.onopen = () => {
+                log('SSE 连接已打开');
+            };
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    log(`收到事件: ${data.type}`);
+                    log(`事件数据: ${JSON.stringify(data, null, 2)}`);
+                } catch (e) {
+                    log(`解析失败: ${e.message}`);
+                }
+            };
+
+            eventSource.onerror = (error) => {
+                log(`SSE 错误: ${JSON.stringify(error)}`);
+            };
+        }
+
+        connectSSE();
+    </script>
+</body>
+</html>

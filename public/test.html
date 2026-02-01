@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>API 测试</title>
+</head>
+<body>
+    <h1>API 测试</h1>
+    <button onclick="testHistory()">测试历史 API</button>
+    <button onclick="testImport()">测试导入 API</button>
+    <div id="result"></div>
+
+    <script>
+        async function testHistory() {
+            try {
+                const response = await fetch('/api/history/opencode');
+                const data = await response.json();
+                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (err) {
+                document.getElementById('result').innerHTML = 'Error: ' + err.message;
+            }
+        }
+
+        async function testImport() {
+            try {
+                const response = await fetch('/api/sessions/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (err) {
+                document.getElementById('result').innerHTML = 'Error: ' + err.message;
+            }
+        }
+    </script>
+</body>
+</html>
