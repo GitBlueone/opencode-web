@@ -732,6 +732,7 @@ function setupMessageInput() {
 
 function openCreateModal() {
     document.getElementById('create-modal').classList.add('active');
+    loadDrives();
     loadDirectory('C:\\Users\\13927');
 }
 
@@ -741,6 +742,35 @@ function closeCreateModal() {
 }
 
 let currentDirectoryPath = '';
+
+async function loadDrives() {
+    try {
+        const response = await fetch('/api/drives');
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error?.message || '加载磁盘列表失败');
+        }
+
+        updateDrivesUI(data.drives);
+    } catch (error) {
+        console.error('Load drives error:', error);
+        showToast('加载磁盘列表失败', 'error');
+    }
+}
+
+function updateDrivesUI(drives) {
+    const drivesListEl = document.getElementById('drives-list');
+    drivesListEl.innerHTML = '';
+
+    drives.forEach(drive => {
+        const item = document.createElement('span');
+        item.className = 'drive-item';
+        item.textContent = drive;
+        item.addEventListener('click', () => loadDirectory(drive));
+        drivesListEl.appendChild(item);
+    });
+}
 
 async function loadDirectory(dirPath) {
     try {
@@ -770,7 +800,8 @@ function updateDirectoryUI(data) {
     selectedPathTextEl.textContent = data.path;
     document.getElementById('session-dir').value = data.path;
 
-    dirUpBtn.disabled = data.path === 'C:\\Users\\13927';
+    const isRootDrive = /^[A-Z]:\\$/.test(data.path);
+    dirUpBtn.disabled = isRootDrive;
 
     directoryListEl.innerHTML = '';
 
@@ -815,10 +846,11 @@ function formatFileSize(bytes) {
 
 function getParentPath(dirPath) {
     const normalized = dirPath.replace(/\\/g, '/');
+
     const lastSlash = normalized.lastIndexOf('/');
 
-    if (lastSlash <= 0) {
-        return 'C:\\';
+    if (lastSlash <= 2 || lastSlash === -1) {
+        return null;
     }
 
     const parentPath = normalized.substring(0, lastSlash);

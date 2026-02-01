@@ -517,20 +517,47 @@ app.post('/api/sessions', async (req, res) => {
   }
 });
 
+app.get('/api/drives', async (req, res) => {
+  try {
+    const { exec } = require('child_process');
+
+    exec('wmic logicaldisk get name', (error, stdout, stderr) => {
+      if (error) {
+        console.error('[获取磁盘列表] 失败:', error.message);
+        return res.status(500).json({
+          error: {
+            type: 'SERVER_ERROR',
+            message: error.message
+          }
+        });
+      }
+
+      const lines = stdout.split('\n')
+        .map(line => line.trim())
+        .filter(line => line && line !== 'Name' && /^[A-Z]:$/.test(line));
+
+      res.json({ drives: lines });
+    });
+  } catch (error) {
+    console.error('[获取磁盘列表] 失败:', error.message);
+    res.status(500).json({
+      error: {
+        type: 'SERVER_ERROR',
+        message: error.message
+      }
+    });
+  }
+});
+
 app.get('/api/directories', async (req, res) => {
   try {
     const { path: dirPath = process.env.USERPROFILE } = req.query;
 
-    const absolutePath = path.resolve(dirPath);
-    const userProfile = process.env.USERPROFILE;
-
-    if (!absolutePath.startsWith(userProfile)) {
-      return res.status(400).json({
-        error: {
-          type: 'INVALID_PATH',
-          message: '只能访问用户目录下的路径'
-        }
-      });
+    let absolutePath;
+    if (/^[A-Z]:$/.test(dirPath)) {
+      absolutePath = dirPath + '\\';
+    } else {
+      absolutePath = path.resolve(dirPath);
     }
 
     if (!fs.existsSync(absolutePath)) {
