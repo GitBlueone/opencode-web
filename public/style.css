@@ -1178,6 +1178,21 @@ body {
         overflow-wrap: break-word;
     }
 
+    .session-messages {
+        min-height: auto;
+        max-height: none;
+        height: auto;
+    }
+
+    .messages-content {
+        min-height: 200px;
+        max-height: 50vh;
+    }
+
+    .message-input-area {
+        margin-top: 0;
+    }
+
     .session-actions {
         flex-direction: column;
     }
