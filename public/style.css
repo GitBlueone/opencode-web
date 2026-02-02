@@ -1579,3 +1579,31 @@ body {
 .terminal-content::-webkit-scrollbar-thumb:hover {
     background: var(--border-hover);
 }
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn:disabled:hover {
+    background: var(--session-actions-btn-primary-background);
+}
+
+.sending-spinner {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.message-failed {
+    border-left: 3px solid var(--danger-color);
+    background: #fef2f2;
+}
+
+.message-failed .part-text {
+    color: #991b1b;
+}

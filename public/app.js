@@ -587,6 +587,9 @@ function renderMessageElement(message) {
 
     const messageElement = document.createElement('div');
     messageElement.className = `message ${roleClass}`.trim();
+    if (message.failed) {
+        messageElement.classList.add('message-failed');
+    }
     messageElement.setAttribute('data-message-id', message.id);
     messageElement.innerHTML = `
         <div>
@@ -783,21 +786,46 @@ function getTokenUsageColor(usage) {
 async function sendMessage() {
     const input = document.getElementById('message-input');
     const content = input.value.trim();
+    const sendBtn = document.getElementById('send-message-btn');
 
     if (!content || !selectedSessionId) {
         return;
     }
 
-    input.value = '';
+    const session = sessions.find(s => s.sessionId === selectedSessionId);
+    if (!session) {
+        console.error('[sendMessage] 找不到会话:', selectedSessionId);
+        showToast('找不到会话', 'error');
+        return;
+    }
+
+    const messageId = `user_${Date.now()}`;
+    const partId = `part_${Date.now()}`;
+
+    const userMessage = {
+        id: messageId,
+        info: {
+            role: 'user',
+            time: {
+                created: Date.now()
+            }
+        },
+        parts: [{
+            id: partId,
+            type: 'text',
+            text: content
+        }]
+    };
+
+    messages.push(userMessage);
+    renderMessageElement(userMessage);
+    scrollToBottom();
+
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = '<span class="sending-spinner">⟳</span> 发送中';
+    showToast('消息发送中...', 'info');
 
     try {
-        // 获取会话信息以获取 directory
-        const session = sessions.find(s => s.sessionId === selectedSessionId);
-        if (!session) {
-            console.error('[sendMessage] 找不到会话:', selectedSessionId);
-            return;
-        }
-
         const response = await fetch(`${API_BASE}/${selectedSessionId}/message?directory=${encodeURIComponent(session.directory)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -805,11 +833,30 @@ async function sendMessage() {
         });
 
         if (!response.ok) {
-            throw new Error('发送消息失败');
+            throw new Error(`发送失败 (${response.status})`);
         }
+
+        input.value = '';
+        showToast('消息已发送', 'success');
     } catch (error) {
-        showToast('发送消息失败', 'error');
         console.error('Send message error:', error);
+        showToast(`发送失败: ${error.message}`, 'error');
+
+        const messageIndex = messages.findIndex(m => m.id === messageId);
+        if (messageIndex !== -1) {
+            messages[messageIndex].failed = true;
+            const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (messageElement) {
+                messageElement.classList.add('message-failed');
+            }
+        }
+    } finally {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>`;
+        input.focus();
     }
 }
 
