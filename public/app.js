@@ -9,6 +9,7 @@ let selectedSessionId = null;
 let sessions = [];
 let messages = [];
 let eventSource = null;
+const sessionSendingStatus = new Map();
 
 function debugLog(...args) {
     if (DEBUG) {
@@ -298,11 +299,31 @@ async function selectSession(sessionId) {
     renderSessionsList(sessions);
     updateCurrentSessionDisplay();
 
+    updateSendButtonState();
+
     showLoadingOverlay();
 
     await loadMessages();
 
     connectSSE();
+}
+
+function updateSendButtonState() {
+    const sendBtn = document.getElementById('send-message-btn');
+    if (!sendBtn) return;
+
+    const isSending = selectedSessionId && sessionSendingStatus.get(selectedSessionId);
+
+    if (isSending) {
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<span class="sending-spinner">⟳</span> 发送中';
+    } else {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>`;
+    }
 }
 
 async function loadMessages() {
@@ -792,6 +813,11 @@ async function sendMessage() {
         return;
     }
 
+    if (sessionSendingStatus.get(selectedSessionId)) {
+        console.log('[sendMessage] 当前会话正在发送，忽略重复请求');
+        return;
+    }
+
     const session = sessions.find(s => s.sessionId === selectedSessionId);
     if (!session) {
         console.error('[sendMessage] 找不到会话:', selectedSessionId);
@@ -821,8 +847,9 @@ async function sendMessage() {
     renderMessageElement(userMessage);
     scrollToBottom();
 
-    sendBtn.disabled = true;
-    sendBtn.innerHTML = '<span class="sending-spinner">⟳</span> 发送中';
+    sessionSendingStatus.set(selectedSessionId, true);
+    updateSendButtonState();
+
     showToast('消息发送中...', 'info');
 
     try {
@@ -851,11 +878,8 @@ async function sendMessage() {
             }
         }
     } finally {
-        sendBtn.disabled = false;
-        sendBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>`;
+        sessionSendingStatus.delete(selectedSessionId);
+        updateSendButtonState();
         input.focus();
     }
 }
