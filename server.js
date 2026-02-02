@@ -1089,13 +1089,6 @@ app.get('/api/sessions/:id/messages', async (req, res) => {
         console.log(`[Token统计] 会话: ${sessionTitle}`);
         console.log(`[Token统计] ID: ${req.params.id}`);
         console.log(`[Token统计] Token使用: 输入=${sessionTokenUsage.input}, 输出=${sessionTokenUsage.output}, 思考=${sessionTokenUsage.reasoning}, 缓存读=${sessionTokenUsage.cacheRead}, 总计=${sessionTokenUsage.total}`);
-
-        // 在响应中也返回 token 使用情况，方便前端显示
-        res.json({
-            messages: recentMessages,
-            tokenUsage: sessionTokenUsage
-        });
-        }
     }
 
     // 在响应中也返回 token 使用情况，方便前端显示
