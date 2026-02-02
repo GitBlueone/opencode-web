@@ -391,6 +391,34 @@ body {
     justify-content: center;
 }
 
+.active-sessions-section {
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.active-sessions-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.active-sessions-icon {
+    font-size: 0.9rem;
+}
+
+.active-sessions-title {
+    flex: 1;
+}
+
+.active-sessions-list {
+    padding: 0.25rem 0;
+}
+
 .sidebar-empty {
     text-align: center;
     padding: 2rem 1rem;

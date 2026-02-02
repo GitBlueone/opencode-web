@@ -152,6 +152,38 @@ function renderSessionsList(sessionsData) {
         return;
     }
 
+    const activeSessions = sessionsData
+        .filter(session => session.active === true)
+        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+        .slice(0, 3);
+
+    let html = '';
+    if (activeSessions.length > 0) {
+        html += `
+            <div class="active-sessions-section">
+                <div class="active-sessions-header">
+                    <span class="active-sessions-icon">⚡</span>
+                    <span class="active-sessions-title">活跃会话</span>
+                </div>
+                <div class="active-sessions-list">
+                    ${activeSessions.map(session => {
+                        const time = new Date(session.updatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                        return `
+                            <div class="session-item ${session.sessionId === selectedSessionId ? 'active' : ''}"
+                                 data-session-id="${session.sessionId}">
+                                <div class="session-item-icon running"></div>
+                                <div class="session-item-content">
+                                    <div class="session-item-title">${escapeHtml(session.title || '未命名会话')}</div>
+                                    <div class="session-item-time">${time}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
     const groups = new Map();
     sessionsData.forEach(session => {
         const dir = session.directory || '默认目录';
@@ -167,7 +199,7 @@ function renderSessionsList(sessionsData) {
         dirIndexMap.set(dir, index);
     });
 
-    sessionsList.innerHTML = sortedDirs.map((dir, dirIndex) => {
+    html += sortedDirs.map((dir, dirIndex) => {
         const sessionsInDir = groups.get(dir);
         const isExpanded = expandedDirectories.has(dir);
         const dirDisplayName = dir.split('\\').filter(Boolean).pop() || dir;
@@ -228,6 +260,8 @@ function renderSessionsList(sessionsData) {
             </div>
         `;
     }).join('');
+
+    sessionsList.innerHTML = html;
 }
 
 function toggleDirectory(directory) {
