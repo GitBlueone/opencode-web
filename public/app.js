@@ -416,7 +416,7 @@ function connectSSE() {
                                 reasoning: tokens.reasoning || 0
                             };
 
-                            if (newUsage.total > 0) {
+                            if (!currentSession.tokenUsage || newUsage.total > 0) {
                                 currentSession.tokenUsage = newUsage;
                                 updateCurrentSessionDisplay();
                             }
@@ -683,11 +683,19 @@ function updateCurrentSessionDisplay() {
 }
 
 function formatTokenUsage(usage) {
-    if (!usage || usage.total === 0) {
+    if (!usage) {
+        return '暂无数据';
+    }
+
+    if (typeof usage.total === 'undefined' || usage.total === null) {
         return '暂无数据';
     }
 
     const total = usage.total || 0;
+    if (total === 0) {
+        return '暂无数据';
+    }
+
     const input = usage.input || 0;
     const output = usage.output || 0;
     const reasoning = usage.reasoning || 0;
