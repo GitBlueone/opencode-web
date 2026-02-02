@@ -11,6 +11,7 @@ let messages = [];
 let eventSource = null;
 const sessionSendingStatus = new Map();
 const processedTempMessageIds = new Set();
+const sessionEventSources = new Map();  // sessionId -> EventSource
 
 function debugLog(...args) {
     if (DEBUG) {
@@ -309,7 +310,8 @@ async function selectSession(sessionId) {
 
     await loadMessages();
 
-    connectSSE();
+    // 建立新的 SSE 连接（不关闭旧连接，支持多会话并行）
+    connectSSE(sessionId);
 }
 
 function updateSendButtonState() {
@@ -387,22 +389,27 @@ async function loadMessages() {
     }
 }
 
-function connectSSE() {
-    if (eventSource) {
-        eventSource.close();
-    }
-
+function connectSSE(sessionId) {
     // 获取会话信息以获取 directory
-    const session = sessions.find(s => s.sessionId === selectedSessionId);
+    const session = sessions.find(s => s.sessionId === sessionId);
     if (!session) {
-        console.error('[connectSSE] 找不到会话:', selectedSessionId);
+        console.error('[connectSSE] 找不到会话:', sessionId);
         return;
     }
 
-    const url = `/api/sessions/${selectedSessionId}/events?directory=${encodeURIComponent(session.directory)}`;
-    eventSource = new EventSource(url);
+    // 如果已经有连接，直接返回
+    if (sessionEventSources.has(sessionId)) {
+        debugLog(`[SSE] 会话 ${sessionId} 的连接已存在，跳过创建`);
+        return;
+    }
 
-    eventSource.onmessage = (event) => {
+    const url = `/api/sessions/${sessionId}/events?directory=${encodeURIComponent(session.directory)}`;
+    const newEventSource = new EventSource(url);
+    sessionEventSources.set(sessionId, newEventSource);
+
+    debugLog(`[SSE] 正在连接到会话 ${sessionId}, URL: ${url}`);
+
+    newEventSource.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
 
@@ -425,6 +432,7 @@ function connectSSE() {
                     break;
             }
 
+            // 只处理当前选中的会话事件
             if (eventSessionId && eventSessionId !== selectedSessionId) {
                 return;
             }
@@ -494,6 +502,7 @@ function connectSSE() {
                         processedTempMessageIds.delete(msgInfo.id);
                     }
 
+                    // Assistant 消息完成时提醒用户
                     if (msgInfo.role === 'assistant' && msgInfo.tokens) {
                         const currentSession = sessions.find(s => s.sessionId === selectedSessionId);
                         if (currentSession) {
@@ -510,6 +519,14 @@ function connectSSE() {
                                 currentSession.tokenUsage = newUsage;
                                 updateCurrentSessionDisplay();
                             }
+
+                            // 如果不是当前会话，显示通知
+                            if (eventSessionId && eventSessionId !== selectedSessionId) {
+                                const sourceSession = sessions.find(s => s.sessionId === eventSessionId);
+                                if (sourceSession) {
+                                    showToast(`[${sourceSession.title}] AI 回复已完成`, 'success');
+                                }
+                            }
                         }
                     }
                     break;
@@ -524,24 +541,22 @@ function connectSSE() {
         }
     };
 
-    eventSource.onerror = (error) => {
-        console.error('SSE 连接错误:', error);
-        eventSource.close();
-        eventSource = null;
+    newEventSource.onerror = (error) => {
+        console.error(`[SSE] 会话 ${sessionId} 连接错误:`, error);
+        newEventSource.close();
+        sessionEventSources.delete(sessionId);
 
-        const session = sessions.find(s => s.sessionId === selectedSessionId);
-        if (!session || session.sessionId !== selectedSessionId) {
-            return;
+        // 只重连当前选中的会话
+        if (selectedSessionId === sessionId) {
+            setTimeout(() => {
+                if (selectedSessionId) {
+                    connectSSE(selectedSessionId);
+                }
+            }, 3000);
         }
-
-        setTimeout(() => {
-            if (selectedSessionId) {
-                connectSSE();
-            }
-        }, 3000);
     };
 
-    debugLog(`[SSE] 已连接到会话 ${selectedSessionId}`);
+    debugLog(`[SSE] ✓ 已连接到会话 ${sessionId}`);
 }
 
 function renderMessages(messagesData, animate = false) {
@@ -1100,17 +1115,19 @@ async function deleteCurrentSession() {
             throw new Error('删除会话失败');
         }
 
+        // 关闭该会话的 SSE 连接
+        const es = sessionEventSources.get(selectedSessionId);
+        if (es) {
+            es.close();
+            sessionEventSources.delete(selectedSessionId);
+        }
+
         sessions = sessions.filter(s => s.sessionId !== selectedSessionId);
         selectedSessionId = null;
         messages = [];
 
         renderSessionsList(sessions);
         updateCurrentSessionDisplay();
-
-        if (eventSource) {
-            eventSource.close();
-            eventSource = null;
-        }
 
         showToast('会话已删除', 'success');
     } catch (error) {
@@ -1183,12 +1200,17 @@ function hideLoadingOverlay() {
 
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-        if (eventSource) {
-            eventSource.close();
-        }
+        // 页面隐藏时关闭所有 SSE 连接
+        sessionEventSources.forEach((es, sessionId) => {
+            es.close();
+        });
+        sessionEventSources.clear();
+        console.log('[visibilitychange] 页面隐藏，已关闭所有 SSE 连接');
     } else {
+        // 页面显示时重新连接当前会话
         if (selectedSessionId) {
-            connectSSE();
+            connectSSE(selectedSessionId);
+            console.log('[visibilitychange] 页面显示，重新连接当前会话');
         }
     }
 });
