@@ -1,6 +1,10 @@
 const DEBUG = false;
 const expandedDirectories = new Set();
 let currentOpenCodePort = 4096;
+let frontendConfig = {
+    defaultDirectory: '',
+    sseReconnectDelay: 3000
+};
 
 console.log('=== APP.JS v23.9 已加载 - 支持多实例切换 ===');
 
@@ -16,6 +20,17 @@ const sessionEventSources = new Map();  // sessionId -> EventSource
 function debugLog(...args) {
     if (DEBUG) {
         console.log(...args);
+    }
+}
+
+async function loadFrontendConfig() {
+    try {
+        const response = await fetch('/api/config');
+        const data = await response.json();
+        frontendConfig = data;
+        console.log('[配置] 已加载前端配置:', frontendConfig);
+    } catch (error) {
+        console.error('[配置] 加载失败，使用默认值:', error);
     }
 }
 
@@ -552,7 +567,7 @@ function connectSSE(sessionId) {
                 if (selectedSessionId) {
                     connectSSE(selectedSessionId);
                 }
-            }, 3000);
+            }, frontendConfig.sseReconnectDelay);
         }
     };
 
@@ -875,10 +890,12 @@ async function sendMessage() {
         });
 
         if (!response.ok) {
-            throw new Error(`发送失败 (${response.status})`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error?.message || `发送失败 (${response.status})`);
         }
 
-        showToast('消息已发送', 'success');
+        // 消息已发送，流式输出通过 SSE 实时接收
+        showToast('消息已发送，AI 正在回复...', 'success');
     } catch (error) {
         console.error('Send message error:', error);
         showToast(`[${session.title}] ${error.message}`, 'error');
@@ -910,7 +927,7 @@ function setupMessageInput() {
 function openCreateModal() {
     document.getElementById('create-modal').classList.add('active');
     loadDrives();
-    loadDirectory('C:\\Users\\13927');
+    loadDirectory(frontendConfig.defaultDirectory);
 }
 
 function closeCreateModal() {
@@ -1065,6 +1082,7 @@ async function createSession(title, directory) {
 
 async function compressCurrentSession() {
     if (!selectedSessionId) {
+        console.error('[compressCurrentSession] 没有选中的会话');
         return;
     }
 
@@ -1080,10 +1098,11 @@ async function compressCurrentSession() {
         });
 
         if (!response.ok) {
-            throw new Error('压缩会话失败');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error?.message || `压缩失败 (${response.status})`);
         }
 
-        showToast('会话已压缩', 'success');
+        showToast('会话压缩请求已发送，正在后台处理...', 'success');
     } catch (error) {
         showToast('压缩会话失败', 'error');
         console.error('Compress session error:', error);
@@ -1220,4 +1239,10 @@ window.testAppJS = function() {
     return 'app.js v22.1 已加载';
 };
 
-console.log('=== app.js 执行完成，调用 testAppJS:', typeof window.testAppJS);
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadFrontendConfig();
+    await loadSessions();
+    setupSidebarToggle();
+    console.log('=== app.js 执行完成，调用 testAppJS:', typeof window.testAppJS);
+});

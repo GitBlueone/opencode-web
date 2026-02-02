@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const net = require('net');
+const config = require('./config');
 
 // Session token 使用情况缓存
 const sessionTokenUsage = new Map();
@@ -14,7 +15,7 @@ const sessionTokenUsage = new Map();
  * @param {number} timeout - 超时时间（毫秒）
  * @returns {Promise<boolean>}
  */
-function checkPort(port, timeout = 3000) {
+function checkPort(port, timeout = config.timeout.portCheck) {
     return new Promise((resolve) => {
         const socket = new net.Socket();
 
@@ -43,12 +44,12 @@ function checkPort(port, timeout = 3000) {
 }
 
 /**
- * 等待端口可用（轮询检查）
+ * 等待端口可用
  * @param {number} port - 端口号
  * @param {number} maxWait - 最大等待时间（毫秒）
  * @returns {Promise<boolean>}
  */
-async function waitForPort(port, maxWait = 30000) {
+async function waitForPort(port, maxWait = config.timeout.waitForPort) {
     const startTime = Date.now();
     const interval = 500;
 
@@ -166,16 +167,11 @@ function calculateTokenUsageFromMessages(messages) {
 }
 
 const app = express();
-const WEB_SERVER_PORT = 3000;
-const DEFAULT_OPENCODE_SERVE_PORT = 4096;
-const OPENCODE_BASE_URL = `http://localhost`;
-
-const OPENCODE_STORAGE_DIR = path.join(process.env.USERPROFILE, '.local', 'share', 'opencode', 'storage', 'session');
 
 const DIRECTORY_TO_PORT = new Map();
 
 function buildDirectoryToPortMapping() {
-    const storageDir = OPENCODE_STORAGE_DIR;
+    const storageDir = config.opencode.storageDir;
 
     if (!fs.existsSync(storageDir)) {
         console.log('[映射] session 目录不存在');
@@ -220,8 +216,6 @@ function buildDirectoryToPortMapping() {
 buildDirectoryToPortMapping();
 
 // ==================== Serve Manager ====================
-
-const MAX_CONCURRENT_SERVES = 3;
 
 /**
  * ServeManager - 自动管理 opencode serve 实例
@@ -286,7 +280,7 @@ class ServeManager {
             }
         }
 
-        if (this.activeServes.size >= MAX_CONCURRENT_SERVES) {
+        if (this.activeServes.size >= config.opencode.maxConcurrentServes) {
             this.stopLRUServe();
         }
 
@@ -335,7 +329,7 @@ class ServeManager {
             });
 
             // 等待端口真正可用（最多 30 秒）
-            const isPortReady = await waitForPort(port, 30000);
+            const isPortReady = await waitForPort(port, config.timeout.waitForPort);
 
             if (serveProcess.killed || !isPortReady) {
                 console.error(`[ServeManager] serve 启动失败: ${directory} -> 端口未就绪`);
@@ -351,7 +345,7 @@ class ServeManager {
             });
 
             console.log(`[ServeManager] ✓ serve 已启动: ${directory} -> 端口 ${port}`);
-            console.log(`[ServeManager] 当前活跃 serve 数: ${this.activeServes.size}/${MAX_CONCURRENT_SERVES}`);
+            console.log(`[ServeManager] 当前活跃 serve 数: ${this.activeServes.size}/${config.opencode.maxConcurrentServes}`);
 
             resolve();
         });
@@ -452,17 +446,17 @@ app.use((req, res, next) => {
 });
 
 /**
- * 向 opencode serve 发送 HTTP 请求
- * @param {string} path - API 路径（不包含查询参数）
+ * 向 OpenCode serve 发送 HTTP 请求
+ * @param {string} path - 请求路径
  * @param {string} method - HTTP 方法
- * @param {Object} data - 请求 body 数据
- * @param {Object} queryParams - 查询参数对象
+ * @param {object} data - 请求数据
+ * @param {object} queryParams - 查询参数
  * @param {number} port - 端口号
  * @param {number} timeout - 超时时间（毫秒），默认 30 秒
  */
-function openCodeRequest(path, method = 'GET', data = null, queryParams = null, port = DEFAULT_OPENCODE_SERVE_PORT, timeout = 30000) {
+function openCodeRequest(path, method = 'GET', data = null, queryParams = null, port = config.opencode.defaultPort, timeout = config.timeout.openCodeRequest) {
   return new Promise((resolve, reject) => {
-    let url = `${OPENCODE_BASE_URL}:${port}${path}`;
+    let url = `http://${config.server.host}:${port}${path}`;
 
     if (queryParams) {
       const queryString = Object.keys(queryParams)
@@ -522,19 +516,19 @@ function getAllSessionsFromStorage() {
   const allSessions = [];
 
   try {
-    if (!fs.existsSync(OPENCODE_STORAGE_DIR)) {
-      console.log('[存储] session 目录不存在:', OPENCODE_STORAGE_DIR);
+    if (!fs.existsSync(config.opencode.storageDir)) {
+      console.log('[存储] session 目录不存在:', config.opencode.storageDir);
       return allSessions;
     }
 
-    const projectDirs = fs.readdirSync(OPENCODE_STORAGE_DIR, { withFileTypes: true })
+    const projectDirs = fs.readdirSync(config.opencode.storageDir, { withFileTypes: true })
       .filter(dirent => dirent.isDirectory())
       .map(dirent => dirent.name);
 
     console.log(`[存储] 找到 ${projectDirs.length} 个 projectID:`, projectDirs);
 
     for (const projectId of projectDirs) {
-      const projectDir = path.join(OPENCODE_STORAGE_DIR, projectId);
+      const projectDir = path.join(config.opencode.storageDir, projectId);
 
       const sessionFiles = fs.readdirSync(projectDir, { withFileTypes: true })
         .filter(dirent => dirent.isFile() && dirent.name.endsWith('.json'))
@@ -575,7 +569,7 @@ app.post('/api/sessions', async (req, res) => {
     const targetDirectory = directory || process.cwd();
 
     await serveManager.ensureServe(targetDirectory);
-    const port = DIRECTORY_TO_PORT.get(targetDirectory) || DEFAULT_OPENCODE_SERVE_PORT;
+    const port = DIRECTORY_TO_PORT.get(targetDirectory) || config.opencode.defaultPort;
 
     const createData = {
       projectID: 'global',
@@ -609,6 +603,26 @@ app.post('/api/sessions', async (req, res) => {
     res.json(webSession);
   } catch (error) {
     console.error('[创建会话] 失败:', error.message);
+    res.status(500).json({
+      error: {
+        type: 'SERVER_ERROR',
+        message: error.message
+      }
+    });
+  }
+});
+
+/**
+ * 获取前端配置
+ */
+app.get('/api/config', async (req, res) => {
+  try {
+    res.json({
+      defaultDirectory: config.frontend.defaultDirectory,
+      sseReconnectDelay: config.frontend.sseReconnectDelay
+    });
+  } catch (error) {
+    console.error('[获取配置] 失败:', error.message);
     res.status(500).json({
       error: {
         type: 'SERVER_ERROR',
@@ -750,7 +764,7 @@ app.get('/api/sessions', async (req, res) => {
     const webSessions = pureSessions.map(parentSession => {
         const children = parentToChildren.get(parentSession.id) || [];
 
-        const port = DIRECTORY_TO_PORT.get(parentSession.directory) || DEFAULT_OPENCODE_SERVE_PORT;
+        const port = DIRECTORY_TO_PORT.get(parentSession.directory) || config.opencode.defaultPort;
 
         // 获取 token 使用情况
         const parentTokenUsage = sessionTokenUsage.get(parentSession.id) || { total: 0, input: 0, output: 0, reasoning: 0 };
@@ -925,14 +939,15 @@ app.post('/api/sessions/:id/message', async (req, res) => {
       messageData,
       null,
       port,
-      60000
+      config.timeout.sendMessage
     );
 
-    if (result.status !== 200) {
+    // 接受 200 (同步完成) 或 202 (异步处理中) 状态码
+    if (result.status !== 200 && result.status !== 202) {
       throw new Error(`opencode serve 返回错误: ${result.status}`);
     }
 
-    console.log('[发送消息] ✓ 成功');
+    console.log(`[发送消息] ✓ 消息发送${result.status === 200 ? '成功' : '请求已接受'}`);
 
     res.json(result.data);
   } catch (error) {
@@ -974,11 +989,12 @@ app.post('/api/sessions/:id/compress', async (req, res) => {
       modelID: 'glm-4.7'
     }, null, port);
 
-    if (result.status !== 200) {
+    // 接受 200 (同步完成) 或 202 (异步处理中) 状态码
+    if (result.status !== 200 && result.status !== 202) {
       throw new Error(`压缩会话失败: ${result.status}`);
     }
 
-    console.log(`[API] ✓ 会话 ${req.params.id} 压缩成功`);
+    console.log(`[API] ✓ 会话 ${req.params.id} 压缩请求已${result.status === 200 ? '完成' : '接受'}`);
 
     res.json({
       success: true,
@@ -1121,7 +1137,7 @@ app.get('/api/sessions/:id/events', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('Access-Control-Allow-Origin', '*');
 
-  const eventUrl = `${OPENCODE_BASE_URL}:${port}/event`;
+  const eventUrl = `http://${config.server.host}:${port}/event`;
 
   console.log(`[SSE] 建立连接，会话: ${req.params.id}, 端口: ${port}`);
 
@@ -1162,7 +1178,7 @@ app.get('/api/serves/status', (req, res) => {
   const status = serveManager.getStatus();
   res.json({
     total: status.length,
-    max: MAX_CONCURRENT_SERVES,
+    max: config.opencode.maxConcurrentServes,
     serves: status
   });
 });
@@ -1175,17 +1191,17 @@ app.use(express.static('public', {
 
 // ==================== 服务器启动 ====================
 
-app.listen(WEB_SERVER_PORT, () => {
+app.listen(config.server.port, () => {
   console.log('='.repeat(50));
   console.log('OpenCode Web 服务器已启动（自动管理 serve 架构）');
   console.log('='.repeat(50));
-  console.log(`Web 服务器: http://localhost:${WEB_SERVER_PORT}`);
-  console.log(`Serve 管理器: 最多 ${MAX_CONCURRENT_SERVES} 个并发 serve，使用 LRU 策略`);
-  console.log(`已映射 ${DIRECTORY_TO_PORT.size} 个项目目录到端口 ${DEFAULT_OPENCODE_SERVE_PORT}-${DEFAULT_OPENCODE_SERVE_PORT + DIRECTORY_TO_PORT.size - 1}`);
+  console.log(`Web 服务器: http://localhost:${config.server.port}`);
+  console.log(`Serve 管理器: 最多 ${config.opencode.maxConcurrentServes} 个并发 serve，使用 LRU 策略`);
+  console.log(`已映射 ${DIRECTORY_TO_PORT.size} 个项目目录到端口 ${config.opencode.defaultPort}-${config.opencode.defaultPort + DIRECTORY_TO_PORT.size - 1}`);
   console.log('='.repeat(50));
   console.log('');
   console.log('💡 serve 管理器会在访问 session 时自动启动对应的 opencode serve');
-  console.log(`💡 超过 ${MAX_CONCURRENT_SERVES} 个时，会自动关闭最久未使用的 serve`);
+  console.log(`💡 超过 ${config.opencode.maxConcurrentServes} 个时，会自动关闭最久未使用的 serve`);
   console.log('');
   console.log('📊 可用项目目录:');
   DIRECTORY_TO_PORT.forEach((port, directory) => {
