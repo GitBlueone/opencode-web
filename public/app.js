@@ -273,10 +273,27 @@ function toggleDirectory(directory) {
     renderSessionsList(sessions);
 }
 
+function updateActiveSessions(maxActive = 3) {
+    const now = new Date().toISOString();
+
+    const currentSession = sessions.find(s => s.sessionId === selectedSessionId);
+    if (currentSession) {
+        currentSession.updatedAt = now;
+    }
+
+    sessions.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+    sessions.forEach((session, index) => {
+        session.active = index < maxActive;
+    });
+}
+
 async function selectSession(sessionId) {
     if (selectedSessionId === sessionId) return;
 
     selectedSessionId = sessionId;
+
+    updateActiveSessions(3);
 
     renderSessionsList(sessions);
     updateCurrentSessionDisplay();
