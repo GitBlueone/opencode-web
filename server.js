@@ -260,6 +260,48 @@ class ServeManager {
 
             DIRECTORY_TO_PORT.set(directory, port);
             console.log(`[ServeManager] 为目录 "${directory}" 动态分配端口: ${port}`);
+        } else {
+            // 对于已有端口映射，也需要检查端口是否被孤立进程占用
+            console.log(`[ServeManager] 目录 "${directory}" 已有端口映射: ${port}`);
+            const isInUse = await isPortInUse(port);
+            if (isInUse) {
+                const existing = this.activeServes.get(directory);
+                if (!existing) {
+                    // 端口被占用，但 ServeManager 没有该目录的记录 -> 可能是孤立进程
+                    console.warn(`[ServeManager] 端口 ${port} 被占用，但 ServeManager 没有该目录的记录，可能是孤立进程`);
+                    console.log(`[ServeManager] 尝试清理端口 ${port} 上的孤立进程...`);
+
+                    // 尝试清理端口上的孤立进程（Windows）
+                    try {
+                        const { exec } = require('child_process');
+                        exec(`netstat -ano | findstr ":${port}"`, (error, stdout) => {
+                            if (!error && stdout) {
+                                const lines = stdout.split('\n');
+                                const pidLine = lines.find(line => line.includes('LISTENING'));
+                                if (pidLine) {
+                                    const parts = pidLine.trim().split(/\s+/);
+                                    const pid = parts[parts.length - 1];
+                                    if (pid) {
+                                        console.log(`[ServeManager] 发现占用端口 ${port} 的进程 PID: ${pid}`);
+                                        exec(`taskkill /F /PID ${pid}`, (killError) => {
+                                            if (killError) {
+                                                console.error(`[ServeManager] 清理进程 ${pid} 失败:`, killError.message);
+                                            } else {
+                                                console.log(`[ServeManager] ✓ 已清理进程 ${pid}`);
+                                            }
+                                        });
+                                    }
+                                }
+                            }
+                        });
+
+                        // 等待进程清理
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    } catch (error) {
+                        console.error(`[ServeManager] 清理端口 ${port} 失败:`, error.message);
+                    }
+                }
+            }
         }
         console.log(`[ServeManager] 目录 "${directory}" 对应端口: ${port}`);
 
