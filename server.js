@@ -963,6 +963,12 @@ app.post('/api/sessions/:id/message', async (req, res) => {
 
 /**
  * 压缩会话
+ *
+ * 注意：OpenCode 的 /summarize API 会等待压缩完成才返回 200 响应。
+ * 为了避免 HTTP 请求超时，我们采用以下策略：
+ * 1. 立即返回 202 Accepted 给前端
+ * 2. 在后台等待压缩完成
+ * 3. 压缩进度通过 SSE 事件 (session.compacted) 传递给前端
  */
 app.post('/api/sessions/:id/compress', async (req, res) => {
   console.log(`[API] /api/sessions/:id/compress 被调用`);
@@ -982,29 +988,34 @@ app.post('/api/sessions/:id/compress', async (req, res) => {
 
     const port = await serveManager.ensureServe(directory);
 
-    // 直接调用 opencode serve 的 compress API
-    console.log(`[API] 正在压缩会话 ${req.params.id}...`);
-    const result = await openCodeRequest(`/session/${req.params.id}/summarize`, 'POST', {
+    // 发起压缩请求，但不等待响应（在后台运行）
+    console.log(`[API] 正在启动压缩会话 ${req.params.id}...`);
+    openCodeRequest(`/session/${req.params.id}/summarize`, 'POST', {
       providerID: 'zhipuai-coding-plan',
       modelID: 'glm-4.7'
-    }, null, port);
+    }, null, port, config.timeout.compressRequest)
+      .then(result => {
+        if (result.status === 200) {
+          console.log(`[压缩会话] ✓ 会话 ${req.params.id} 压缩完成`);
+        } else {
+          console.log(`[压缩会话] ✗ 会话 ${req.params.id} 压缩失败: ${result.status}`);
+        }
+      })
+      .catch(compressError => {
+        console.error(`[压缩会话] ✗ 会话 ${req.params.id} 压缩异常:`, compressError.message);
+      });
 
-    // 接受 200 (同步完成) 或 202 (异步处理中) 状态码
-    if (result.status !== 200 && result.status !== 202) {
-      throw new Error(`压缩会话失败: ${result.status}`);
-    }
-
-    console.log(`[API] ✓ 会话 ${req.params.id} 压缩请求已${result.status === 200 ? '完成' : '接受'}`);
-
-    res.json({
+    // 立即返回 202 Accepted 给前端
+    console.log(`[API] ✓ 会话 ${req.params.id} 压缩请求已发送`);
+    res.status(202).json({
       success: true,
-      message: '会话已压缩'
+      message: '会话压缩请求已发送，正在后台处理...'
     });
   } catch (error) {
-    console.error('[压缩会话] 失败:', error.message);
+    console.error('[压缩会话] 启动失败:', error.message);
     res.status(500).json({
       error: {
-        type: 'OPENCODE_ERROR',
+        type: 'SERVER_ERROR',
         message: error.message
       }
     });
@@ -1082,19 +1093,21 @@ app.get('/api/sessions/:id/messages', async (req, res) => {
         // 自动压缩：如果 token 总数超过 100000，自动调用压缩
         if (sessionTokenUsage.total > 100000) {
             console.log(`[自动压缩] 会话 ${req.params.id} token 数量 ${sessionTokenUsage.total} 超过阈值，开始压缩...`);
-            try {
-                const compressResult = await openCodeRequest(`/session/${req.params.id}/summarize`, 'POST', {
-                    providerID: 'zhipuai-coding-plan',
-                    modelID: 'glm-4.7'
-                }, null, port);
-                if (compressResult.status === 200) {
-                    console.log(`[自动压缩] ✓ 会话 ${req.params.id} 压缩成功`);
-                } else {
-                    console.log(`[自动压缩] ✗ 会话 ${req.params.id} 压缩失败: ${compressResult.status}`);
-                }
-            } catch (compressError) {
-                console.error(`[自动压缩] ✗ 会话 ${req.params.id} 压缩异常:`, compressError.message);
-            }
+            // 发起压缩请求，但不等待响应（在后台运行）
+            openCodeRequest(`/session/${req.params.id}/summarize`, 'POST', {
+                providerID: 'zhipuai-coding-plan',
+                modelID: 'glm-4.7'
+            }, null, port, config.timeout.compressRequest)
+                .then(result => {
+                    if (result.status === 200) {
+                        console.log(`[自动压缩] ✓ 会话 ${req.params.id} 压缩完成`);
+                    } else {
+                        console.log(`[自动压缩] ✗ 会话 ${req.params.id} 压缩失败: ${result.status}`);
+                    }
+                })
+                .catch(compressError => {
+                    console.error(`[自动压缩] ✗ 会话 ${req.params.id} 压缩异常:`, compressError.message);
+                });
         }
     }
 

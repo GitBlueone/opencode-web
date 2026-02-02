@@ -32,8 +32,10 @@ module.exports = {
         waitForPort: parseInt(process.env.WAIT_FOR_PORT_TIMEOUT) || 30000,
         // OpenCode 请求默认超时
         openCodeRequest: parseInt(process.env.OPENCODE_REQUEST_TIMEOUT) || 30000,
-        // 发送消息超时
-        sendMessage: parseInt(process.env.SEND_MESSAGE_TIMEOUT) || 60000,
+        // 发送消息超时（复杂任务可能需要长时间处理）
+        sendMessage: parseInt(process.env.SEND_MESSAGE_TIMEOUT) || 20 * 60 * 1000,  // 默认 20 分钟
+        // 压缩会话超时（OpenCode summarize API 会等待完成才返回）
+        compressRequest: parseInt(process.env.COMPRESS_REQUEST_TIMEOUT) || 10 * 60 * 1000,  // 默认 10 分钟
         // 健康检查间隔
         healthCheck: parseInt(process.env.HEALTH_CHECK_INTERVAL) || 60000
     },
