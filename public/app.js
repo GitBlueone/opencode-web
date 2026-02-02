@@ -416,8 +416,10 @@ function connectSSE() {
                                 reasoning: tokens.reasoning || 0
                             };
 
-                            currentSession.tokenUsage = newUsage;
-                            updateCurrentSessionDisplay();
+                            if (newUsage.total > 0) {
+                                currentSession.tokenUsage = newUsage;
+                                updateCurrentSessionDisplay();
+                            }
                         }
                     }
                     break;
