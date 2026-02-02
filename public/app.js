@@ -10,6 +10,7 @@ let sessions = [];
 let messages = [];
 let eventSource = null;
 const sessionSendingStatus = new Map();
+const processedTempMessageIds = new Set();
 
 function debugLog(...args) {
     if (DEBUG) {
@@ -301,6 +302,9 @@ async function selectSession(sessionId) {
 
     updateSendButtonState();
 
+    // 清空临时消息 ID 集合
+    processedTempMessageIds.clear();
+
     showLoadingOverlay();
 
     await loadMessages();
@@ -316,7 +320,7 @@ function updateSendButtonState() {
 
     if (isSending) {
         sendBtn.disabled = true;
-        sendBtn.innerHTML = '<span class="sending-spinner">⟳</span> 发送中';
+        sendBtn.innerHTML = '<span class="sending-spinner">⟳</span>';
     } else {
         sendBtn.disabled = false;
         sendBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -458,6 +462,12 @@ function connectSSE() {
                     debugLog('[SSE] message.updated - existing message:', message ? `found, role=${message.info?.role}` : 'not found');
 
                     if (!message) {
+                        // 检查是否已经处理过这个临时消息 ID（避免重复添加）
+                        if (processedTempMessageIds.has(msgInfo.id)) {
+                            debugLog('[SSE] 跳过已处理的临时消息:', msgInfo.id);
+                            return;
+                        }
+
                         message = {
                             id: msgInfo.id,
                             info: { role: msgInfo.role, time: msgInfo.time },
@@ -468,12 +478,20 @@ function connectSSE() {
                         debugLog('[SSE] 创建新消息:', JSON.stringify(message));
                         renderMessageElement(message);
                         scrollToBottom();
+
+                        // 标记这个临时消息已处理
+                        if (msgInfo.role === null || !msgInfo.role) {
+                            processedTempMessageIds.add(msgInfo.id);
+                        }
                     } else if (message.info?.role === null && msgInfo.role) {
                         message.info.role = msgInfo.role;
                         message.info.time = msgInfo.time;
 
                         debugLog('[SSE] 更新消息 role:', msgInfo.role);
                         updateMessageElementClass(message);
+
+                        // role 更新后，从临时消息集合中移除
+                        processedTempMessageIds.delete(msgInfo.id);
                     }
 
                     if (msgInfo.role === 'assistant' && msgInfo.tokens) {
@@ -825,27 +843,9 @@ async function sendMessage() {
         return;
     }
 
-    const messageId = `user_${Date.now()}`;
-    const partId = `part_${Date.now()}`;
-
-    const userMessage = {
-        id: messageId,
-        info: {
-            role: 'user',
-            time: {
-                created: Date.now()
-            }
-        },
-        parts: [{
-            id: partId,
-            type: 'text',
-            text: content
-        }]
-    };
-
-    messages.push(userMessage);
-    renderMessageElement(userMessage);
-    scrollToBottom();
+    // 清空输入框（立即执行，无论成功失败）
+    input.value = '';
+    input.style.height = 'auto';
 
     sessionSendingStatus.set(selectedSessionId, true);
     updateSendButtonState();
@@ -863,20 +863,10 @@ async function sendMessage() {
             throw new Error(`发送失败 (${response.status})`);
         }
 
-        input.value = '';
         showToast('消息已发送', 'success');
     } catch (error) {
         console.error('Send message error:', error);
-        showToast(`发送失败: ${error.message}`, 'error');
-
-        const messageIndex = messages.findIndex(m => m.id === messageId);
-        if (messageIndex !== -1) {
-            messages[messageIndex].failed = true;
-            const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
-            if (messageElement) {
-                messageElement.classList.add('message-failed');
-            }
-        }
+        showToast(`[${session.title}] ${error.message}`, 'error');
     } finally {
         sessionSendingStatus.delete(selectedSessionId);
         updateSendButtonState();
