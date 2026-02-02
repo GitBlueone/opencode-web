@@ -1090,24 +1090,11 @@ app.get('/api/sessions/:id/messages', async (req, res) => {
         console.log(`[Token统计] ID: ${req.params.id}`);
         console.log(`[Token统计] Token使用: 输入=${sessionTokenUsage.input}, 输出=${sessionTokenUsage.output}, 思考=${sessionTokenUsage.reasoning}, 缓存读=${sessionTokenUsage.cacheRead}, 总计=${sessionTokenUsage.total}`);
 
-        // 自动压缩：如果 token 总数超过 100000，自动调用压缩
-        if (sessionTokenUsage.total > 100000) {
-            console.log(`[自动压缩] 会话 ${req.params.id} token 数量 ${sessionTokenUsage.total} 超过阈值，开始压缩...`);
-            // 发起压缩请求，但不等待响应（在后台运行）
-            openCodeRequest(`/session/${req.params.id}/summarize`, 'POST', {
-                providerID: 'zhipuai-coding-plan',
-                modelID: 'glm-4.7'
-            }, null, port, config.timeout.compressRequest)
-                .then(result => {
-                    if (result.status === 200) {
-                        console.log(`[自动压缩] ✓ 会话 ${req.params.id} 压缩完成`);
-                    } else {
-                        console.log(`[自动压缩] ✗ 会话 ${req.params.id} 压缩失败: ${result.status}`);
-                    }
-                })
-                .catch(compressError => {
-                    console.error(`[自动压缩] ✗ 会话 ${req.params.id} 压缩异常:`, compressError.message);
-                });
+        // 在响应中也返回 token 使用情况，方便前端显示
+        res.json({
+            messages: recentMessages,
+            tokenUsage: sessionTokenUsage
+        });
         }
     }
 

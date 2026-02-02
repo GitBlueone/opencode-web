@@ -542,6 +542,12 @@ function connectSSE(sessionId) {
                                     showToast(`[${sourceSession.title}] AI 回复已完成`, 'success');
                                 }
                             }
+
+                            // 自动压缩：如果 token 总数超过 100000，自动调用压缩
+                            if (newUsage.total > 100000) {
+                                console.log(`[SSE] 触发自动压缩: ${currentSession.title}, total=${newUsage.total}`);
+                                autoCompressSession(selectedSessionId);
+                            }
                         }
                     }
                     break;
@@ -1106,6 +1112,32 @@ async function compressCurrentSession() {
     } catch (error) {
         showToast('压缩会话失败', 'error');
         console.error('Compress session error:', error);
+    }
+}
+
+// 自动压缩会话（由 SSE 事件触发）
+async function autoCompressSession(sessionId) {
+    const session = sessions.find(s => s.sessionId === sessionId);
+    if (!session) {
+        console.error('[autoCompressSession] 找不到会话:', sessionId);
+        return;
+    }
+
+    console.log(`[自动压缩] 触发自动压缩: ${session.title}`);
+    try {
+        const response = await fetch(`${API_BASE}/${sessionId}/compress?directory=${encodeURIComponent(session.directory)}`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.error('[自动压缩] 失败:', errorData.error?.message);
+            return;
+        }
+
+        console.log('[自动压缩] ✓ 请求已发送');
+    } catch (error) {
+        console.error('[自动压缩] 异常:', error);
     }
 }
 
