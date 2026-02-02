@@ -271,23 +271,83 @@ class ServeManager {
                     console.warn(`[ServeManager] 端口 ${port} 被占用，但 ServeManager 没有该目录的记录，可能是孤立进程`);
                     console.log(`[ServeManager] 尝试清理端口 ${port} 上的孤立进程...`);
 
-                    // 尝试清理端口上的孤立进程（Windows）
+                    // 尝试清理端口上的孤立进程（跨平台兼容）
                     try {
-                        const { exec } = require('child_process');
-                        exec(`netstat -ano | findstr ":${port}"`, (error, stdout) => {
+                        const { exec, spawn } = require('child_process');
+                        
+                        // 跨平台方式查找端口占用进程
+                        const findPidCommand = process.platform === 'win32' 
+                            ? `netstat -ano | findstr ":${port}"`
+                            : `lsof -i:${port} -t -P`;
+                        
+                        exec(findPidCommand, (error, stdout) => {
                             if (!error && stdout) {
                                 const lines = stdout.split('\n');
-                                const pidLine = lines.find(line => line.includes('LISTENING'));
-                                if (pidLine) {
-                                    const parts = pidLine.trim().split(/\s+/);
+                                // 查找 LISTENING 状态的行
+                                const listeningLine = lines.find(line => 
+                                    line.includes('LISTENING') || line.includes('LISTEN')
+                                );
+                                
+                                if (listeningLine) {
+                                    // 解析 PID（最后一列）
+                                    const parts = listeningLine.trim().split(/\s+/);
                                     const pid = parts[parts.length - 1];
-                                    if (pid) {
+                                    
+                                    if (pid && pid !== '0') {
                                         console.log(`[ServeManager] 发现占用端口 ${port} 的进程 PID: ${pid}`);
-                                        exec(`taskkill /F /PID ${pid}`, (killError) => {
-                                            if (killError) {
-                                                console.error(`[ServeManager] 清理进程 ${pid} 失败:`, killError.message);
+                                        
+                                        // 安全检查：验证进程是否为 opencode 或 node 进程
+                                        const getProcessNameCommand = process.platform === 'win32'
+                                            ? `tasklist /FI "PID eq ${pid}" /FO CSV /NH`
+                                            : `ps -p ${pid} -o comm=`;
+                                        
+                                        exec(getProcessNameCommand, (nameError, nameStdout) => {
+                                            if (!nameError && nameStdout) {
+                                                let isOpencodeProcess = false;
+                                                let processName = '';
+                                                
+                                                if (process.platform === 'win32') {
+                                                    // Windows: 解析 tasklist 输出（CSV 格式）
+                                                    const lines = nameStdout.split('\n');
+                                                    for (const line of lines) {
+                                                        if (line.includes(pid)) {
+                                                            const fields = line.split(',');
+                                                            if (fields.length > 1) {
+                                                                processName = fields[0].trim();
+                                                                isOpencodeProcess = processName.toLowerCase().includes('opencode') || 
+                                                                                    processName.toLowerCase().includes('node');
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    // Linux/Mac: ps 输出
+                                                    processName = nameStdout.trim();
+                                                    isOpencodeProcess = processName.toLowerCase().includes('opencode') || 
+                                                                        processName.toLowerCase().includes('node');
+                                                }
+                                                
+                                                if (isOpencodeProcess) {
+                                                    console.log(`[ServeManager] ✓ 进程验证通过: ${processName} (PID: ${pid})`);
+                                                    
+                                                    // 跨平台终止进程
+                                                    const killCommand = process.platform === 'win32'
+                                                        ? `taskkill /F /PID ${pid}`
+                                                        : `kill -9 ${pid}`;
+                                                        
+                                                    exec(killCommand, (killError) => {
+                                                        if (killError) {
+                                                            console.error(`[ServeManager] 清理进程 ${pid} 失败:`, killError.message);
+                                                        } else {
+                                                            console.log(`[ServeManager] ✓ 已清理进程 ${pid} (${processName})`);
+                                                        }
+                                                    });
+                                                } else {
+                                                    console.warn(`[ServeManager] ⚠️  端口 ${port} 被其他进程占用: ${processName || '未知'} (PID: ${pid})`);
+                                                    console.warn(`[ServeManager] ⚠️  不自动清理，请手动检查并释放端口 ${port}`);
+                                                }
                                             } else {
-                                                console.log(`[ServeManager] ✓ 已清理进程 ${pid}`);
+                                                console.warn(`[ServeManager] ⚠️ 无法获取进程信息，跳过清理 PID: ${pid}`);
                                             }
                                         });
                                     }
