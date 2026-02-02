@@ -3,9 +3,76 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const net = require('net');
 
 // Session token 使用情况缓存
 const sessionTokenUsage = new Map();
+
+/**
+ * 检测端口是否可连接
+ * @param {number} port - 端口号
+ * @param {number} timeout - 超时时间（毫秒）
+ * @returns {Promise<boolean>}
+ */
+function checkPort(port, timeout = 3000) {
+    return new Promise((resolve) => {
+        const socket = new net.Socket();
+
+        socket.setTimeout(timeout);
+
+        socket.on('connect', () => {
+            socket.destroy();
+            resolve(true);
+        });
+
+        socket.on('timeout', () => {
+            socket.destroy();
+            resolve(false);
+        });
+
+        socket.on('error', () => {
+            resolve(false);
+        });
+
+        socket.on('close', () => {
+            resolve(false);
+        });
+
+        socket.connect(port, 'localhost');
+    });
+}
+
+/**
+ * 等待端口可用（轮询检查）
+ * @param {number} port - 端口号
+ * @param {number} maxWait - 最大等待时间（毫秒）
+ * @returns {Promise<boolean>}
+ */
+async function waitForPort(port, maxWait = 30000) {
+    const startTime = Date.now();
+    const interval = 500;
+
+    while (Date.now() - startTime < maxWait) {
+        const isAvailable = await checkPort(port, 1000);
+        if (isAvailable) {
+            console.log(`[端口检测] ✓ 端口 ${port} 可用，耗时 ${Date.now() - startTime}ms`);
+            return true;
+        }
+        await new Promise(resolve => setTimeout(resolve, interval));
+    }
+
+    console.log(`[端口检测] ✗ 端口 ${port} 在 ${maxWait}ms 内未就绪`);
+    return false;
+}
+
+/**
+ * 检测端口是否被占用
+ * @param {number} port - 端口号
+ * @returns {Promise<boolean>}
+ */
+async function isPortInUse(port) {
+    return await checkPort(port, 1000);
+}
 
 // 计算总 token 数
 function calculateTotalTokens(tokens) {
@@ -177,27 +244,51 @@ class ServeManager {
         let port = DIRECTORY_TO_PORT.get(directory);
         if (!port) {
             console.warn(`[ServeManager] 目录 "${directory}" 没有端口映射`);
-            // 动态分配一个新端口
-            port = 4096 + DIRECTORY_TO_PORT.size;
+
+            let newPort = 4096 + DIRECTORY_TO_PORT.size;
+            let portAttempts = 0;
+            const maxAttempts = 10;
+
+            while (portAttempts < maxAttempts) {
+                const isInUse = await isPortInUse(newPort);
+                if (!isInUse) {
+                    port = newPort;
+                    break;
+                }
+                console.warn(`[ServeManager] 端口 ${newPort} 已被占用，尝试下一个`);
+                newPort++;
+                portAttempts++;
+            }
+
+            if (!port) {
+                throw new Error(`无法分配可用端口，已尝试 ${maxAttempts} 次`);
+            }
+
             DIRECTORY_TO_PORT.set(directory, port);
             console.log(`[ServeManager] 为目录 "${directory}" 动态分配端口: ${port}`);
         }
         console.log(`[ServeManager] 目录 "${directory}" 对应端口: ${port}`);
 
-        // 更新最后使用时间
         const existing = this.activeServes.get(directory);
         if (existing) {
             existing.lastUsed = Date.now();
             console.log(`[ServeManager] 更新使用时间: ${directory} -> 端口 ${port}`);
-            return port;
+
+            try {
+                const healthCheck = await openCodeRequest('/session', 'GET', null, null, port, 5000);
+                if (healthCheck.status === 200) {
+                    return port;
+                }
+            } catch (error) {
+                console.warn(`[ServeManager] serve 健康检查失败: ${error.message}`);
+                this.activeServes.delete(directory);
+            }
         }
 
-        // 如果已达到最大数量，停止最久未使用的 serve
         if (this.activeServes.size >= MAX_CONCURRENT_SERVES) {
             this.stopLRUServe();
         }
 
-        // 启动新 serve
         await this.startServe(directory, port);
         return port;
     }
@@ -208,7 +299,7 @@ class ServeManager {
      * @param {number} port - 端口号
      */
     startServe(directory, port) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             console.log(`[ServeManager] 启动 serve: ${directory} -> 端口 ${port}`);
             console.log(`[ServeManager] 工作目录: ${directory}`);
 
@@ -242,25 +333,26 @@ class ServeManager {
                 this.activeServes.delete(directory);
             });
 
-            // 等待 5 秒，假设 serve 已经启动
-            setTimeout(() => {
-                if (serveProcess.killed) {
-                    console.error(`[ServeManager] serve 进程已被终止: ${directory}`);
-                    reject(new Error('serve 进程启动失败'));
-                    return;
-                }
+            // 等待端口真正可用（最多 30 秒）
+            const isPortReady = await waitForPort(port, 30000);
 
-                this.activeServes.set(directory, {
-                    process: serveProcess,
-                    port: port,
-                    lastUsed: Date.now()
-                });
+            if (serveProcess.killed || !isPortReady) {
+                console.error(`[ServeManager] serve 启动失败: ${directory} -> 端口未就绪`);
+                this.activeServes.delete(directory);
+                reject(new Error('serve 进程启动失败，端口未就绪'));
+                return;
+            }
 
-                console.log(`[ServeManager] ✓ serve 已启动: ${directory} -> 端口 ${port}`);
-                console.log(`[ServeManager] 当前活跃 serve 数: ${this.activeServes.size}/${MAX_CONCURRENT_SERVES}`);
+            this.activeServes.set(directory, {
+                process: serveProcess,
+                port: port,
+                lastUsed: Date.now()
+            });
 
-                resolve();
-            }, 5000);
+            console.log(`[ServeManager] ✓ serve 已启动: ${directory} -> 端口 ${port}`);
+            console.log(`[ServeManager] 当前活跃 serve 数: ${this.activeServes.size}/${MAX_CONCURRENT_SERVES}`);
+
+            resolve();
         });
     }
 
@@ -364,8 +456,10 @@ app.use((req, res, next) => {
  * @param {string} method - HTTP 方法
  * @param {Object} data - 请求 body 数据
  * @param {Object} queryParams - 查询参数对象
+ * @param {number} port - 端口号
+ * @param {number} timeout - 超时时间（毫秒），默认 30 秒
  */
-function openCodeRequest(path, method = 'GET', data = null, queryParams = null, port = DEFAULT_OPENCODE_SERVE_PORT) {
+function openCodeRequest(path, method = 'GET', data = null, queryParams = null, port = DEFAULT_OPENCODE_SERVE_PORT, timeout = 30000) {
   return new Promise((resolve, reject) => {
     let url = `${OPENCODE_BASE_URL}:${port}${path}`;
 
@@ -387,7 +481,8 @@ function openCodeRequest(path, method = 'GET', data = null, queryParams = null, 
       method,
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      timeout
     };
 
     const req = http.request(url, options, (res) => {
@@ -405,6 +500,11 @@ function openCodeRequest(path, method = 'GET', data = null, queryParams = null, 
 
     req.on('error', (error) => {
       reject(error);
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error(`请求超时 (${timeout}ms): ${method} ${url}`));
     });
 
     if (data) {
@@ -823,7 +923,8 @@ app.post('/api/sessions/:id/message', async (req, res) => {
       'POST',
       messageData,
       null,
-      port
+      port,
+      60000
     );
 
     if (result.status !== 200) {

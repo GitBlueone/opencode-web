@@ -473,8 +473,15 @@ function connectSSE() {
         eventSource.close();
         eventSource = null;
 
+        const session = sessions.find(s => s.sessionId === selectedSessionId);
+        if (!session || session.sessionId !== selectedSessionId) {
+            return;
+        }
+
         setTimeout(() => {
-            connectSSE();
+            if (selectedSessionId) {
+                connectSSE();
+            }
         }, 3000);
     };
 
