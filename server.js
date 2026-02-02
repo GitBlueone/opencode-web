@@ -281,7 +281,8 @@ class ServeManager {
                 }
             } catch (error) {
                 console.warn(`[ServeManager] serve 健康检查失败: ${error.message}`);
-                this.activeServes.delete(directory);
+                // 先停止旧的 serve 进程，避免端口冲突和资源泄漏
+                this.stopServe(directory, '健康检查失败');
             }
         }
 
