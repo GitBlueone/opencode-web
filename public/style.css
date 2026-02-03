@@ -1301,13 +1301,16 @@ body {
         top: var(--navbar-height);
         bottom: 0;
         z-index: 90;
-        transform: translateX(-100%);
+        transform: translateX(-100%) translateZ(0);
         width: var(--sidebar-width);
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: transform;
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
     }
 
     .sidebar.open {
-        transform: translateX(0);
+        transform: translateX(0) translateZ(0);
     }
 
     .sidebar.collapsed {

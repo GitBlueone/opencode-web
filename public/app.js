@@ -1292,6 +1292,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadFrontendConfig();
     await loadSessions();
     setupSidebarToggle();
+
+    // 移动端侧边栏初始化：确保 CSS transform 正确生效
+    if (window.innerWidth <= 768) {
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+            const transform = window.getComputedStyle(sidebar).transform;
+            console.log('[初始化] 移动端侧边栏 transform 值:', transform);
+        }
+    }
+
     console.log('[DOMContentLoaded] 初始化完成');
     console.log('=== app.js 执行完成，调用 testAppJS:', typeof window.testAppJS);
 });
+
