@@ -62,21 +62,31 @@ function setupSidebarToggle() {
     });
 
     let touchStartX = 0;
+    let touchStartY = 0;
     let touchEndX = 0;
+    let touchEndY = 0;
 
     document.addEventListener('touchstart', (e) => {
         touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
     }, false);
 
     document.addEventListener('touchend', (e) => {
         if (window.innerWidth <= 768) {
             touchEndX = e.changedTouches[0].screenX;
-            const diff = touchEndX - touchStartX;
+            touchEndY = e.changedTouches[0].screenY;
+            
+            const diffX = touchEndX - touchStartX;
+            const diffY = touchEndY - touchStartY;
 
-            if (diff > 50) {
-                sidebar.classList.add('open');
-            } else if (diff < -50) {
-                sidebar.classList.remove('open');
+            // 只有当水平滑动距离大于垂直滑动距离时才处理（避免误触）
+            // 并且滑动距离达到阈值（100px）
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 100) {
+                if (diffX > 0) {
+                    sidebar.classList.add('open');
+                } else {
+                    sidebar.classList.remove('open');
+                }
             }
         }
     }, false);
