@@ -46,10 +46,7 @@ function setupSidebarToggle() {
     const sidebar = document.getElementById('sidebar');
 
     sidebarToggle.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log('[按钮点击] 切换侧边栏, 屏幕宽度:', window.innerWidth);
-
+        console.log('[按钮点击] 触发侧边栏切换');
         if (window.innerWidth <= 768) {
             sidebar.classList.toggle('open');
             console.log('[按钮点击] 侧边栏状态:', sidebar.classList.contains('open') ? '打开' : '关闭');
@@ -62,44 +59,32 @@ function setupSidebarToggle() {
         if (window.innerWidth <= 768) {
             if (!sidebar.contains(e.target) && !sidebarToggle.contains(e.target)) {
                 sidebar.classList.remove('open');
+                console.log('[点击外部] 关闭侧边栏');
             }
         }
     });
 
+    // 简化版触摸滑动：从屏幕左边缘向右滑动时打开侧边栏
     let touchStartX = 0;
-    let touchStartY = 0;
-    let touchEndX = 0;
-    let touchEndY = 0;
 
     document.addEventListener('touchstart', (e) => {
-        touchStartX = e.changedTouches[0].screenX;
-        touchStartY = e.changedTouches[0].screenY;
-    }, false);
+        touchStartX = e.touches[0].clientX;
+        console.log('[触摸开始] 起始位置:', touchStartX);
+    }, { passive: true });
 
-    document.addEventListener('touchend', (e) => {
-        if (window.innerWidth <= 768) {
-            touchEndX = e.changedTouches[0].screenX;
-            touchEndY = e.changedTouches[0].screenY;
+    document.addEventListener('touchmove', (e) => {
+        if (window.innerWidth <= 768 && touchStartX < 20) {
+            const currentX = e.touches[0].clientX;
+            const diffX = currentX - touchStartX;
 
-            const diffX = touchEndX - touchStartX;
-            const diffY = touchEndY - touchStartY;
-
-            console.log('[触摸滑动] diffX:', diffX, 'diffY:', diffY);
-
-            // 只有当水平滑动距离大于垂直滑动距离时才处理（避免误触）
-            // 并且滑动距离达到阈值（60px，比之前的100px更容易触发）
-            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 60) {
-                // 从左向右滑（正向）打开，从右向左滑（负向）关闭
-                if (diffX > 0) {
-                    console.log('[侧边栏] 打开');
-                    sidebar.classList.add('open');
-                } else {
-                    console.log('[侧边栏] 关闭');
-                    sidebar.classList.remove('open');
-                }
+            // 从左边缘向右滑动超过 50px
+            if (diffX > 50) {
+                sidebar.classList.add('open');
+                console.log('[滑动打开] 侧边栏已展开');
+                touchStartX = -1; // 标记已处理
             }
         }
-    }, false);
+    }, { passive: true });
 
     setupSessionsListEvents();
 }
