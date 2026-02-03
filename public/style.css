@@ -1318,7 +1318,7 @@ body {
     }
 
     .content-area {
-        padding: 1rem 1rem 6rem 1rem;
+        padding: 1rem 1rem 1rem 1rem;
         overflow-x: hidden;
     }
 
@@ -1337,7 +1337,7 @@ body {
 
     .message-bubble {
         max-width: 100%;
-        padding: 0.25rem 0.75rem;
+        padding: 0.75rem 0.75rem;
     }
 
     .message.user .message-bubble {
@@ -1413,7 +1413,7 @@ body {
         --session-messages-flex: 1;
 
         --messages-content-min-height: 200px;
-        --messages-content-max-height: 50vh;
+        --messages-content-max-height: calc(100vh - var(--navbar-height) - 200px);
         --messages-content-min-height-mobile: 0;
     }
 
