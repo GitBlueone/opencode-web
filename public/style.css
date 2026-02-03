@@ -1331,6 +1331,25 @@ body {
         overscroll-behavior-x: contain;
     }
 
+    .message {
+        max-width: 100%;
+    }
+
+    .message-bubble {
+        max-width: 100%;
+        word-break: break-word;
+        overflow-wrap: break-word;
+        white-space: pre-wrap;
+    }
+
+    .message.user .message-bubble {
+        max-width: 85%;
+    }
+
+    .message.assistant .message-bubble {
+        max-width: 100%;
+    }
+
     :root {
         --welcome-icon-size: 3rem;
         --welcome-heading-font-size: 1.5rem;
