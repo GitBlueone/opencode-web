@@ -471,8 +471,9 @@ body {
 
 .directory-sessions {
     padding-left: 1.25rem;
-    transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
-    max-height: 2000px;
+    transition: max-height 0.3s ease-out, opacity 0.3s ease-out, padding 0.3s ease-out;
+    max-height: 0;
+    opacity: 0;
     overflow: hidden;
 }
 
@@ -486,6 +487,8 @@ body {
 .directory-sessions.expanded {
     max-height: 2000px;
     opacity: 1;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
 }
 
 /* 日期分组 */

@@ -35,10 +35,10 @@ async function loadFrontendConfig() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    loadSessions();
-    setupSidebarToggle();
+    console.log('[DOMContentLoaded] 页面加载开始');
     setupMessageInput();
     setupCreateModal();
+    // 注意：setupSidebarToggle() 会在下面异步加载后调用
 });
 
 function setupSidebarToggle() {
@@ -104,14 +104,21 @@ function setupCreateModal() {
 
 function setupSessionsListEvents() {
     const sessionsList = document.getElementById('sessions-list');
+    console.log('[setupSessionsListEvents] 事件监听器已绑定到', sessionsList);
 
     sessionsList.addEventListener('click', (e) => {
+        console.log('[点击事件] 目标:', e.target, '类名:', e.target.className);
+
         const directoryHeader = e.target.closest('.directory-header');
         const sessionItem = e.target.closest('.session-item');
+
+        console.log('[点击事件] directoryHeader:', directoryHeader);
+        console.log('[点击事件] sessionItem:', sessionItem);
 
         if (directoryHeader) {
             e.stopPropagation();
             const directory = directoryHeader.dataset.directory;
+            console.log('[目录点击] directory:', directory);
             toggleDirectory(directory);
         } else if (sessionItem) {
             const sessionId = sessionItem.dataset.sessionId;
@@ -220,7 +227,10 @@ function renderSessionsList(sessionsData) {
     html += sortedDirs.map((dir, dirIndex) => {
         const sessionsInDir = groups.get(dir);
         const isExpanded = expandedDirectories.has(dir);
-        const dirDisplayName = dir.split('\\').filter(Boolean).pop() || dir;
+        // 跨平台路径处理：支持 Windows (\) 和 Unix (/)
+        const dirDisplayName = dir.split(/[\\/]/).filter(Boolean).pop() || dir;
+
+        console.log(`[渲染目录] dir="${dir}", isExpanded=${isExpanded}, displayName="${dirDisplayName}"`);
 
         // 按更新时间排序（降序，越晚越前）
         sessionsInDir.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
@@ -1273,8 +1283,10 @@ window.testAppJS = function() {
 
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('[DOMContentLoaded] 第二个监听器开始执行');
     await loadFrontendConfig();
     await loadSessions();
     setupSidebarToggle();
+    console.log('[DOMContentLoaded] 初始化完成');
     console.log('=== app.js 执行完成，调用 testAppJS:', typeof window.testAppJS);
 });
