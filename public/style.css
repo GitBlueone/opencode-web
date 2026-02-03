@@ -1337,10 +1337,7 @@ body {
 
     .message-bubble {
         max-width: 100%;
-        word-break: break-word;
-        overflow-wrap: break-word;
-        white-space: pre-wrap;
-        padding: 0.5rem 0.75rem;
+        padding: 0.25rem 0.75rem;
     }
 
     .message.user .message-bubble {
