@@ -64,26 +64,40 @@ function setupSidebarToggle() {
         }
     });
 
-    // 简化版触摸滑动：从屏幕左边缘向右滑动时打开侧边栏
-    let touchStartX = 0;
+    // 触摸滑动：全屏支持从左向右打开，从右向左关闭
+    let touchStartX = null;
+    let hasSwiped = false;
 
     document.addEventListener('touchstart', (e) => {
         touchStartX = e.touches[0].clientX;
+        hasSwiped = false;
         console.log('[触摸开始] 起始位置:', touchStartX);
     }, { passive: true });
 
     document.addEventListener('touchmove', (e) => {
-        if (window.innerWidth <= 768 && touchStartX < 20) {
+        if (window.innerWidth <= 768 && touchStartX !== null && !hasSwiped) {
             const currentX = e.touches[0].clientX;
             const diffX = currentX - touchStartX;
+            const isOpen = sidebar.classList.contains('open');
 
-            // 从左边缘向右滑动超过 50px
-            if (diffX > 50) {
+            // 从左向右滑动：打开侧边栏
+            if (!isOpen && diffX > 100) {
                 sidebar.classList.add('open');
                 console.log('[滑动打开] 侧边栏已展开');
-                touchStartX = -1; // 标记已处理
+                hasSwiped = true;
+            }
+            // 从右向左滑动：关闭侧边栏
+            else if (isOpen && diffX < -100) {
+                sidebar.classList.remove('open');
+                console.log('[滑动关闭] 侧边栏已收起');
+                hasSwiped = true;
             }
         }
+    }, { passive: true });
+
+    document.addEventListener('touchend', () => {
+        touchStartX = null;
+        hasSwiped = false;
     }, { passive: true });
 
     setupSessionsListEvents();
