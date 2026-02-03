@@ -45,9 +45,14 @@ function setupSidebarToggle() {
     const sidebarToggle = document.getElementById('sidebar-toggle');
     const sidebar = document.getElementById('sidebar');
 
-    sidebarToggle.addEventListener('click', () => {
+    sidebarToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[按钮点击] 切换侧边栏, 屏幕宽度:', window.innerWidth);
+
         if (window.innerWidth <= 768) {
             sidebar.classList.toggle('open');
+            console.log('[按钮点击] 侧边栏状态:', sidebar.classList.contains('open') ? '打开' : '关闭');
         } else {
             sidebar.classList.toggle('collapsed');
         }
@@ -75,16 +80,21 @@ function setupSidebarToggle() {
         if (window.innerWidth <= 768) {
             touchEndX = e.changedTouches[0].screenX;
             touchEndY = e.changedTouches[0].screenY;
-            
+
             const diffX = touchEndX - touchStartX;
             const diffY = touchEndY - touchStartY;
 
+            console.log('[触摸滑动] diffX:', diffX, 'diffY:', diffY);
+
             // 只有当水平滑动距离大于垂直滑动距离时才处理（避免误触）
-            // 并且滑动距离达到阈值（100px）
-            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 100) {
+            // 并且滑动距离达到阈值（60px，比之前的100px更容易触发）
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 60) {
+                // 从左向右滑（正向）打开，从右向左滑（负向）关闭
                 if (diffX > 0) {
+                    console.log('[侧边栏] 打开');
                     sidebar.classList.add('open');
                 } else {
+                    console.log('[侧边栏] 关闭');
                     sidebar.classList.remove('open');
                 }
             }
