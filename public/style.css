@@ -604,6 +604,7 @@ body {
 .main-content {
     flex: 1;
     overflow-y: hidden;
+    overflow-x: hidden;
     background: var(--bg-color);
 }
 
@@ -837,6 +838,8 @@ body {
     flex: var(--messages-content-flex);
     padding: 1rem;
     overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-x: contain;
     min-height: var(--messages-content-min-height);
     display: flex;
     flex-direction: column;
@@ -1313,6 +1316,16 @@ body {
 
     .content-area {
         padding: 1rem 1rem 6rem 1rem;
+        overflow-x: hidden;
+    }
+
+    .session-messages {
+        overflow-x: hidden;
+    }
+
+    .messages-content {
+        overflow-x: hidden;
+        overscroll-behavior-x: contain;
     }
 
     :root {
