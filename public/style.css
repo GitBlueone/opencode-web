@@ -1340,10 +1340,11 @@ body {
         word-break: break-word;
         overflow-wrap: break-word;
         white-space: pre-wrap;
+        padding: 0.5rem 0.75rem;
     }
 
     .message.user .message-bubble {
-        max-width: 85%;
+        max-width: 90%;
     }
 
     .message.assistant .message-bubble {
