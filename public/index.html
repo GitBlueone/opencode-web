@@ -76,7 +76,15 @@
                 <div class="session-detail" id="session-detail" style="display: none;">
                     <div class="session-detail-header">
                         <div class="session-title-row">
-                            <h2 id="detail-name">会话名称</h2>
+                            <div class="session-title-wrapper">
+                                <h2 id="detail-name">会话名称</h2>
+                                <button class="btn btn-icon-only edit-title-btn" id="edit-title-btn" onclick="openEditTitleModal()" title="编辑标题">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                </button>
+                            </div>
                             <span class="session-status-badge" id="detail-status">运行中</span>
                             <button class="btn btn-icon-only meta-toggle-btn" id="meta-toggle" onclick="toggleMetaInfo()">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -215,6 +223,31 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">取消</button>
                     <button type="submit" class="btn btn-primary">创建</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 编辑标题模态框 -->
+    <div id="edit-title-modal" class="modal">
+        <div class="modal-content modal-content-small">
+            <div class="modal-header">
+                <h2>编辑会话标题</h2>
+                <button class="close-btn" onclick="closeEditTitleModal()">&times;</button>
+            </div>
+            <form id="edit-title-form" onsubmit="saveTitle(event)">
+                <div class="form-group">
+                    <label for="edit-title-input">会话标题</label>
+                    <input
+                        type="text"
+                        id="edit-title-input"
+                        placeholder="输入新的会话标题..."
+                        maxlength="100"
+                    >
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditTitleModal()">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
                 </div>
             </form>
         </div>

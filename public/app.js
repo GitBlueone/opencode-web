@@ -151,6 +151,56 @@ function setupSessionsListEvents() {
     });
 }
 
+// 刷新单个会话的标题（由 SSE session.updated 事件触发）
+let titleRefreshTimer = null;
+function refreshSessionTitle(sessionId, properties) {
+    if (!sessionId || !properties) return;
+    
+    const info = properties.info;
+    if (!info) return;
+    
+    const newTitle = info.title;
+    if (!newTitle) return;
+    
+    const sessionIndex = sessions.findIndex(s => s.sessionId === sessionId);
+    if (sessionIndex !== -1 && sessions[sessionIndex].title !== newTitle) {
+        sessions[sessionIndex].title = newTitle;
+        
+        // 防抖：短时间内多次更新只渲染一次
+        if (titleRefreshTimer) {
+            clearTimeout(titleRefreshTimer);
+        }
+        titleRefreshTimer = setTimeout(() => {
+            renderSessionsList(sessions);
+            if (selectedSessionId === sessionId) {
+                updateCurrentSessionDisplay();
+            }
+            console.log(`[标题更新] 会话 ${sessionId.substring(0, 12)}... 标题已更新为: ${newTitle}`);
+        }, 500);
+    }
+}
+
+// 更新当前选中会话的显示信息
+function updateCurrentSessionDisplay() {
+    if (!selectedSessionId) {
+        document.getElementById('session-detail').style.display = 'none';
+        document.getElementById('welcome-state').style.display = 'flex';
+        return;
+    }
+    
+    const session = sessions.find(s => s.sessionId === selectedSessionId);
+    if (!session) {
+        document.getElementById('session-detail').style.display = 'none';
+        document.getElementById('welcome-state').style.display = 'flex';
+        return;
+    }
+    
+    document.getElementById('session-detail').style.display = 'block';
+    document.getElementById('welcome-state').style.display = 'none';
+    document.getElementById('detail-name').textContent = session.title || '未命名会话';
+    document.getElementById('detail-status').textContent = session.active ? '运行中' : '已停止';
+}
+
 async function loadSessions() {
     try {
         const response = await fetch(`/api/sessions?port=${currentOpenCodePort}`);
@@ -468,16 +518,20 @@ function connectSSE(sessionId) {
                     break;
                 case 'session.status':
                 case 'session.idle':
-                case 'session.updated':
                     eventSessionId = data.properties?.sessionID;
+                    break;
+                case 'session.updated':
+                    // session.updated 事件的 sessionID 在 info.id 中
+                    eventSessionId = data.properties?.info?.id;
+                    refreshSessionTitle(eventSessionId, data.properties);
                     break;
                 default:
                     eventSessionId = null;
                     break;
             }
 
-            // 只处理当前选中的会话事件
-            if (eventSessionId && eventSessionId !== selectedSessionId) {
+            // 只处理当前选中的会话事件（session.updated 除外，已单独处理）
+            if (data.type !== 'session.updated' && eventSessionId && eventSessionId !== selectedSessionId) {
                 return;
             }
 
@@ -595,15 +649,6 @@ function connectSSE(sessionId) {
         console.error(`[SSE] 会话 ${sessionId} 连接错误:`, error);
         newEventSource.close();
         sessionEventSources.delete(sessionId);
-
-        // 只重连当前选中的会话
-        if (selectedSessionId === sessionId) {
-            setTimeout(() => {
-                if (selectedSessionId) {
-                    connectSSE(selectedSessionId);
-                }
-            }, frontendConfig.sseReconnectDelay);
-        }
     };
 
     debugLog(`[SSE] ✓ 已连接到会话 ${sessionId}`);
@@ -1103,8 +1148,11 @@ async function createSession(title, directory) {
         }
 
         const session = await response.json();
+        
+        // 将新会话添加到本地列表（不重新加载整个列表）
         sessions.push(session);
         renderSessionsList(sessions);
+        
         closeCreateModal();
         showToast('会话已创建', 'success');
 
@@ -1213,6 +1261,75 @@ async function deleteCurrentSession() {
     } catch (error) {
         showToast('删除会话失败', 'error');
         console.error('Delete session error:', error);
+    }
+}
+
+function openEditTitleModal() {
+    if (!selectedSessionId) {
+        return;
+    }
+
+    const session = sessions.find(s => s.sessionId === selectedSessionId);
+    if (!session) {
+        return;
+    }
+
+    document.getElementById('edit-title-input').value = session.title || '';
+    document.getElementById('edit-title-modal').classList.add('active');
+    document.getElementById('edit-title-input').focus();
+}
+
+function closeEditTitleModal() {
+    document.getElementById('edit-title-modal').classList.remove('active');
+}
+
+async function saveTitle(event) {
+    event.preventDefault();
+
+    if (!selectedSessionId) {
+        return;
+    }
+
+    const session = sessions.find(s => s.sessionId === selectedSessionId);
+    if (!session) {
+        return;
+    }
+
+    const newTitle = document.getElementById('edit-title-input').value.trim();
+
+    if (!newTitle) {
+        showToast('标题不能为空', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/${selectedSessionId}?directory=${encodeURIComponent(session.directory)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: newTitle })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error?.message || '更新标题失败');
+        }
+
+        const result = await response.json();
+
+        // 更新本地会话数据
+        const sessionIndex = sessions.findIndex(s => s.sessionId === selectedSessionId);
+        if (sessionIndex !== -1) {
+            sessions[sessionIndex].title = result.title;
+            sessions[sessionIndex].updatedAt = result.updatedAt;
+        }
+
+        renderSessionsList(sessions);
+        updateCurrentSessionDisplay();
+        closeEditTitleModal();
+        showToast('标题已更新', 'success');
+    } catch (error) {
+        showToast(`更新失败: ${error.message}`, 'error');
+        console.error('Update title error:', error);
     }
 }
 

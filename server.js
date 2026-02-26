@@ -260,109 +260,128 @@ class ServeManager {
 
             DIRECTORY_TO_PORT.set(directory, port);
             console.log(`[ServeManager] 为目录 "${directory}" 动态分配端口: ${port}`);
-        } else {
-            // 对于已有端口映射，也需要检查端口是否被孤立进程占用
-            console.log(`[ServeManager] 目录 "${directory}" 已有端口映射: ${port}`);
-            const isInUse = await isPortInUse(port);
-            if (isInUse) {
-                const existing = this.activeServes.get(directory);
-                if (!existing) {
-                    // 端口被占用，但 ServeManager 没有该目录的记录 -> 可能是孤立进程
-                    console.warn(`[ServeManager] 端口 ${port} 被占用，但 ServeManager 没有该目录的记录，可能是孤立进程`);
-                    console.log(`[ServeManager] 尝试清理端口 ${port} 上的孤立进程...`);
+            } else {
+                // 对于已有端口映射，也需要检查端口是否被孤立进程占用
+                console.log(`[ServeManager] 目录 "${directory}" 已有端口映射: ${port}`);
+                const isInUse = await isPortInUse(port);
+                if (isInUse) {
+                    const existing = this.activeServes.get(directory);
+                    if (!existing) {
+                        // 端口被占用，但 ServeManager 没有该目录的记录 -> 可能是孤立进程
+                        console.warn(`[ServeManager] 端口 ${port} 被占用，但 ServeManager 没有该目录的记录，可能是孤立进程`);
 
-                    // 尝试清理端口上的孤立进程（跨平台兼容）
-                    try {
-                        const { exec, spawn } = require('child_process');
-                        
-                        // 跨平台方式查找端口占用进程
-                        const findPidCommand = process.platform === 'win32' 
-                            ? `netstat -ano | findstr ":${port}"`
-                            : `lsof -i:${port} -t -P`;
-                        
-                        exec(findPidCommand, (error, stdout) => {
-                            if (!error && stdout) {
-                                const lines = stdout.split('\n');
-                                // 查找 LISTENING 状态的行
-                                const listeningLine = lines.find(line => 
-                                    line.includes('LISTENING') || line.includes('LISTEN')
-                                );
+                        let cleanupSuccess = false;
+                        const maxRetries = 3;
+                        const cleanupDelay = 5000;
+
+                        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                            console.log(`[ServeManager] 尝试清理端口 ${port} 上的孤立进程 (${attempt}/${maxRetries})...`);
+
+                            try {
+                                const { exec } = require('child_process');
                                 
-                                if (listeningLine) {
-                                    // 解析 PID（最后一列）
-                                    const parts = listeningLine.trim().split(/\s+/);
-                                    const pid = parts[parts.length - 1];
-                                    
-                                    if (pid && pid !== '0') {
-                                        console.log(`[ServeManager] 发现占用端口 ${port} 的进程 PID: ${pid}`);
+                                // 跨平台方式查找端口占用进程
+                                const findPidCommand = process.platform === 'win32' 
+                                    ? `netstat -ano | findstr ":${port}"`
+                                    : `lsof -i:${port} -t -P`;
+                                
+                                exec(findPidCommand, (error, stdout) => {
+                                    if (!error && stdout) {
+                                        const lines = stdout.split('\n');
+                                        // 查找 LISTENING 状态的行
+                                        const listeningLine = lines.find(line => 
+                                            line.includes('LISTENING') || line.includes('LISTEN')
+                                        );
                                         
-                                        // 安全检查：验证进程是否为 opencode 或 node 进程
-                                        const getProcessNameCommand = process.platform === 'win32'
-                                            ? `tasklist /FI "PID eq ${pid}" /FO CSV /NH`
-                                            : `ps -p ${pid} -o comm=`;
-                                        
-                                        exec(getProcessNameCommand, (nameError, nameStdout) => {
-                                            if (!nameError && nameStdout) {
-                                                let isOpencodeProcess = false;
-                                                let processName = '';
+                                        if (listeningLine) {
+                                            // 解析 PID（最后一列）
+                                            const parts = listeningLine.trim().split(/\s+/);
+                                            const pid = parts[parts.length - 1];
+                                            
+                                            if (pid && pid !== '0') {
+                                                console.log(`[ServeManager] 发现占用端口 ${port} 的进程 PID: ${pid}`);
                                                 
-                                                if (process.platform === 'win32') {
-                                                    // Windows: 解析 tasklist 输出（CSV 格式）
-                                                    const lines = nameStdout.split('\n');
-                                                    for (const line of lines) {
-                                                        if (line.includes(pid)) {
-                                                            const fields = line.split(',');
-                                                            if (fields.length > 1) {
-                                                                processName = fields[0].trim();
-                                                                isOpencodeProcess = processName.toLowerCase().includes('opencode') || 
-                                                                                    processName.toLowerCase().includes('node');
-                                                                break;
-                                                            }
-                                                        }
-                                                    }
-                                                } else {
-                                                    // Linux/Mac: ps 输出
-                                                    processName = nameStdout.trim();
-                                                    isOpencodeProcess = processName.toLowerCase().includes('opencode') || 
-                                                                        processName.toLowerCase().includes('node');
-                                                }
+                                                // 安全检查：验证进程是否为 opencode 或 node 进程
+                                                const getProcessNameCommand = process.platform === 'win32'
+                                                    ? `tasklist /FI "PID eq ${pid}" /FO CSV /NH`
+                                                    : `ps -p ${pid} -o comm=`;
                                                 
-                                                if (isOpencodeProcess) {
-                                                    console.log(`[ServeManager] ✓ 进程验证通过: ${processName} (PID: ${pid})`);
-                                                    
-                                                    // 跨平台终止进程
-                                                    const killCommand = process.platform === 'win32'
-                                                        ? `taskkill /F /PID ${pid}`
-                                                        : `kill -9 ${pid}`;
+                                                exec(getProcessNameCommand, (nameError, nameStdout) => {
+                                                    if (!nameError && nameStdout) {
+                                                        let isOpencodeProcess = false;
+                                                        let processName = '';
                                                         
-                                                    exec(killCommand, (killError) => {
-                                                        if (killError) {
-                                                            console.error(`[ServeManager] 清理进程 ${pid} 失败:`, killError.message);
+                                                        if (process.platform === 'win32') {
+                                                            // Windows: 解析 tasklist 输出（CSV 格式）
+                                                            const lines = nameStdout.split('\n');
+                                                            for (const line of lines) {
+                                                                if (line.includes(pid)) {
+                                                                    const fields = line.split(',');
+                                                                    if (fields.length > 1) {
+                                                                        processName = fields[0].trim();
+                                                                        isOpencodeProcess = processName.toLowerCase().includes('opencode') || 
+                                                                                            processName.toLowerCase().includes('node');
+                                                                        break;
+                                                                    }
+                                                                }
+                                                            }
                                                         } else {
-                                                            console.log(`[ServeManager] ✓ 已清理进程 ${pid} (${processName})`);
+                                                            // Linux/Mac: ps 输出
+                                                            processName = nameStdout.trim();
+                                                            isOpencodeProcess = processName.toLowerCase().includes('opencode') || 
+                                                                                processName.toLowerCase().includes('node');
                                                         }
-                                                    });
-                                                } else {
-                                                    console.warn(`[ServeManager] ⚠️  端口 ${port} 被其他进程占用: ${processName || '未知'} (PID: ${pid})`);
-                                                    console.warn(`[ServeManager] ⚠️  不自动清理，请手动检查并释放端口 ${port}`);
-                                                }
-                                            } else {
-                                                console.warn(`[ServeManager] ⚠️ 无法获取进程信息，跳过清理 PID: ${pid}`);
+                                                        
+                                                        if (isOpencodeProcess) {
+                                                            console.log(`[ServeManager] ✓ 进程验证通过: ${processName} (PID: ${pid})`);
+                                                            
+                                                            // 跨平台终止进程
+                                                            const killCommand = process.platform === 'win32'
+                                                                ? `taskkill /F /PID ${pid}`
+                                                                : `kill -9 ${pid}`;
+                                                            
+                                                            exec(killCommand, (killError) => {
+                                                                if (killError) {
+                                                                    console.error(`[ServeManager] 清理进程 ${pid} 失败:`, killError.message);
+                                                                } else {
+                                                                    console.log(`[ServeManager] ✓ 已清理进程 ${pid} (${processName})`);
+                                                                }
+                                                            });
+                                                        } else {
+                                                            console.warn(`[ServeManager] ⚠️  端口 ${port} 被其他进程占用: ${processName || '未知'} (PID: ${pid})`);
+                                                            console.warn(`[ServeManager] ⚠️  不自动清理，请手动检查并释放端口 ${port}`);
+                                                        }
+                                                    } else {
+                                                        console.warn(`[ServeManager] ⚠️ 无法获取进程信息，跳过清理 PID: ${pid}`);
+                                                    }
+                                                });
                                             }
-                                        });
+                                        }
                                     }
-                                }
-                            }
-                        });
+                                });
 
-                        // 等待进程清理
-                        await new Promise(resolve => setTimeout(resolve, 2000));
-                    } catch (error) {
-                        console.error(`[ServeManager] 清理端口 ${port} 失败:`, error.message);
+                                await new Promise(resolve => setTimeout(resolve, cleanupDelay));
+
+                                const stillInUse = await isPortInUse(port);
+                                if (!stillInUse) {
+                                    console.log(`[ServeManager] ✓ 端口 ${port} 已成功释放 (尝试 ${attempt}/${maxRetries})`);
+                                    cleanupSuccess = true;
+                                    break;
+                                } else {
+                                    console.warn(`[ServeManager] ⚠️  端口 ${port} 仍被占用 (尝试 ${attempt}/${maxRetries})`);
+                                }
+                            } catch (error) {
+                                console.error(`[ServeManager] 清理端口 ${port} 失败:`, error.message);
+                            }
+                        }
+
+                        if (!cleanupSuccess) {
+                            console.error(`[ServeManager] ✗ 端口 ${port} 清理失败，已达最大重试次数 (${maxRetries})`);
+                            console.error(`[ServeManager] 请手动检查并释放端口 ${port}`);
+                        }
                     }
                 }
             }
-        }
         console.log(`[ServeManager] 目录 "${directory}" 对应端口: ${port}`);
 
         const existing = this.activeServes.get(directory);
@@ -373,10 +392,16 @@ class ServeManager {
             try {
                 const healthCheck = await openCodeRequest('/session', 'GET', null, null, port, 5000);
                 if (healthCheck.status === 200) {
+                    console.log(`[ServeManager] ✓ 健康检查通过: ${directory} -> 端口 ${port}`);
                     return port;
                 }
             } catch (error) {
-                console.warn(`[ServeManager] serve 健康检查失败: ${error.message}`);
+                console.error(`[ServeManager] ❌ 健康检查失败`);
+                console.error(`[ServeManager] 目录: ${directory}`);
+                console.error(`[ServeManager] 端口: ${port}`);
+                console.error(`[ServeManager] 错误类型: ${error.constructor.name}`);
+                console.error(`[ServeManager] 错误信息: ${error.message}`);
+                console.error(`[ServeManager] ⚠️  当前目录的 serve 进程将被停止，这可能导致正在处理的请求中断`);
                 // 先停止旧的 serve 进程，避免端口冲突和资源泄漏
                 this.stopServe(directory, '健康检查失败');
             }
@@ -958,6 +983,58 @@ app.get('/api/sessions/:id', async (req, res) => {
 });
 
 /**
+ * 更新会话标题
+ */
+app.patch('/api/sessions/:id', async (req, res) => {
+  try {
+    const { title } = req.body;
+    const directory = req.query.directory;
+
+    if (!directory) {
+      return res.status(400).json({
+        error: {
+          type: 'INVALID_REQUEST',
+          message: '缺少必要参数: directory'
+        }
+      });
+    }
+
+    if (!title || typeof title !== 'string' || title.trim() === '') {
+      return res.status(400).json({
+        error: {
+          type: 'INVALID_REQUEST',
+          message: '标题不能为空'
+        }
+      });
+    }
+
+    const port = await serveManager.ensureServe(directory);
+    const result = await openCodeRequest(`/session/${req.params.id}`, 'PATCH', { title: title.trim() }, null, port);
+
+    if (result.status !== 200) {
+      throw new Error(`更新会话标题失败: ${result.status}`);
+    }
+
+    console.log(`[更新标题] ✓ 成功，ID: ${req.params.id}, 新标题: ${title.trim()}`);
+
+    const session = result.data;
+    res.json({
+      sessionId: session.id,
+      title: session.title,
+      updatedAt: new Date(session.time.updated).toISOString()
+    });
+  } catch (error) {
+    console.error('[更新标题] 失败:', error.message);
+    res.status(500).json({
+      error: {
+        type: 'SERVER_ERROR',
+        message: error.message
+      }
+    });
+  }
+});
+
+/**
  * 删除会话
  */
 app.delete('/api/sessions/:id', async (req, res) => {
@@ -1022,9 +1099,11 @@ app.post('/api/sessions/:id/message', async (req, res) => {
       });
     }
 
+    console.log(`[发送消息] 准备发送消息，会话ID: ${req.params.id}, 目录: ${directory}`);
+
     const port = await serveManager.ensureServe(directory);
 
-    console.log(`[发送消息] 会话: ${req.params.id}, 端口: ${port}, 内容: ${content.substring(0, 50)}...`);
+    console.log(`[发送消息] serve已就绪，端口: ${port}, 会话: ${req.params.id}, 消息内容: ${content.substring(0, 100)}...`);
 
     const messageData = {
       parts: [
@@ -1035,6 +1114,8 @@ app.post('/api/sessions/:id/message', async (req, res) => {
       ]
     };
 
+    console.log(`[发送消息] 开始向 OpenCode serve 发送请求，超时: ${config.timeout.sendMessage}ms`);
+
     const result = await openCodeRequest(
       `/session/${req.params.id}/message`,
       'POST',
@@ -1043,6 +1124,8 @@ app.post('/api/sessions/:id/message', async (req, res) => {
       port,
       config.timeout.sendMessage
     );
+
+    console.log(`[发送消息] OpenCode serve 响应状态: ${result.status}`);
 
     // 接受 200 (同步完成) 或 202 (异步处理中) 状态码
     if (result.status !== 200 && result.status !== 202) {
@@ -1053,7 +1136,14 @@ app.post('/api/sessions/:id/message', async (req, res) => {
 
     res.json(result.data);
   } catch (error) {
-    console.error('[发送消息] 失败:', error.message);
+    console.error('[发送消息] ❌ 失败');
+    console.error('[发送消息] 会话ID:', req.params.id);
+    console.error('[发送消息] 目录:', directory);
+    console.error('[发送消息] 端口:', port);
+    console.error('[发送消息] 消息内容:', content);
+    console.error('[发送消息] 错误类型:', error.constructor.name);
+    console.error('[发送消息] 错误信息:', error.message);
+    console.error('[发送消息] ⚠️  用户消息可能已丢失，请检查 OpenCode serve 状态');
     res.status(500).json({
       error: {
         type: 'OPENCODE_ERROR',
