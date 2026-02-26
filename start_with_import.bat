@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 cd /d "%~dp0opencode-web"
 
 echo 步骤 1: 导入 OpenCode 历史会话...

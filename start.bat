@@ -1,4 +1,6 @@
 @echo off
+chcp 65001 >nul
+REM OpenCode Web 管理界面启动脚本
 REM OpenCode Web 管理界面启动脚本
 
 echo.

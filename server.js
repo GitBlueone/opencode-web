@@ -4,7 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const net = require('net');
+const Database = require('better-sqlite3');
 const config = require('./config');
+
 
 // Session token 使用情况缓存
 const sessionTokenUsage = new Map();
@@ -171,10 +173,30 @@ const app = express();
 const DIRECTORY_TO_PORT = new Map();
 
 function buildDirectoryToPortMapping() {
-    const storageDir = config.opencode.storageDir;
+    // 优先从 SQLite 读取目录映射（新版）
+    const dbPath = path.join(process.env.USERPROFILE, '.local', 'share', 'opencode', 'opencode.db');
+    try {
+        if (fs.existsSync(dbPath)) {
+            const db = new Database(dbPath, { readonly: true });
+            const rows = db.prepare('SELECT DISTINCT directory FROM session WHERE directory IS NOT NULL').all();
+            for (const row of rows) {
+                if (row.directory && !DIRECTORY_TO_PORT.has(row.directory)) {
+                    const port = 4096 + DIRECTORY_TO_PORT.size;
+                    DIRECTORY_TO_PORT.set(row.directory, port);
+                    console.log(`[映射-SQLite] "${row.directory}" -> 端口 ${port}`);
+                }
+            }
+            db.close();
+            console.log(`[映射-SQLite] 从数据库读取 ${rows.length} 个目录`);
+        }
+    } catch (error) {
+        console.error('[映射-SQLite] 读取失败:', error.message);
+    }
 
+    // 再从 JSON 文件读取（旧版兼容）
+    const storageDir = config.opencode.storageDir;
     if (!fs.existsSync(storageDir)) {
-        console.log('[映射] session 目录不存在');
+        console.log('[映射-JSON] session 目录不存在');
         return;
     }
 
@@ -182,7 +204,7 @@ function buildDirectoryToPortMapping() {
         .filter(dirent => dirent.isDirectory())
         .map(dirent => dirent.name);
 
-    console.log(`[映射] 找到 ${projectDirs.length} 个 projectID`);
+    console.log(`[映射-JSON] 找到 ${projectDirs.length} 个 projectID`);
 
     for (const projectId of projectDirs) {
         const projectDir = path.join(storageDir, projectId);
@@ -192,7 +214,6 @@ function buildDirectoryToPortMapping() {
 
         if (sessionFiles.length === 0) continue;
 
-        // 遍历所有会话文件，确保每个目录都被映射
         for (const sessionFile of sessionFiles) {
             const sessionFilePath = path.join(projectDir, sessionFile);
             try {
@@ -202,10 +223,10 @@ function buildDirectoryToPortMapping() {
                 if (directory && !DIRECTORY_TO_PORT.has(directory)) {
                     const port = 4096 + DIRECTORY_TO_PORT.size;
                     DIRECTORY_TO_PORT.set(directory, port);
-                    console.log(`[映射] "${directory}" -> 端口 ${port} (projectID: ${projectId.substring(0, 8)}...)`);
+                    console.log(`[映射-JSON] "${directory}" -> 端口 ${port}`);
                 }
             } catch (error) {
-                console.error(`[映射] 读取会话文件失败: ${sessionFile}`, error.message);
+                console.error(`[映射-JSON] 读取会话文件失败: ${sessionFile}`, error.message);
             }
         }
     }
@@ -637,11 +658,69 @@ function openCodeRequest(path, method = 'GET', data = null, queryParams = null, 
 }
 
 /**
- * 从存储目录读取所有 projectID 的 sessions
+ * 从 SQLite 数据库读取所有 sessions（新版 opencode 存储）
+ */
+function getSessionsFromSQLite() {
+  const sessions = [];
+  const dbPath = path.join(process.env.USERPROFILE, '.local', 'share', 'opencode', 'opencode.db');
+
+  try {
+    if (!fs.existsSync(dbPath)) {
+      return sessions;
+    }
+
+    const db = new Database(dbPath, { readonly: true });
+    const rows = db.prepare('SELECT * FROM session').all();
+
+    for (const row of rows) {
+      sessions.push({
+        id: row.id,
+        slug: row.slug,
+        version: row.version,
+        projectID: row.project_id,
+        parentID: row.parent_id,
+        directory: row.directory,
+        title: row.title,
+        time: {
+          created: row.time_created,
+          updated: row.time_updated,
+          compacting: row.time_compacting,
+          archived: row.time_archived
+        },
+        summary: {
+          additions: row.summary_additions || 0,
+          deletions: row.summary_deletions || 0,
+          files: row.summary_files || 0
+        }
+      });
+    }
+
+    db.close();
+    console.log(`[SQLite] 读取 ${sessions.length} 个 sessions`);
+  } catch (error) {
+    console.error('[SQLite] 读取失败:', error.message);
+  }
+
+  return sessions;
+}
+
+/**
+ * 从存储目录读取所有 projectID 的 sessions（JSON 文件 + SQLite）
  */
 function getAllSessionsFromStorage() {
   const allSessions = [];
+  const sessionIds = new Set();
 
+  // 优先从 SQLite 读取（新版 opencode 存储）
+  const sqliteSessions = getSessionsFromSQLite();
+  for (const session of sqliteSessions) {
+    if (!sessionIds.has(session.id)) {
+      sessionIds.add(session.id);
+      allSessions.push(session);
+    }
+  }
+
+  // 再从 JSON 文件读取（旧版兼容）
   try {
     if (!fs.existsSync(config.opencode.storageDir)) {
       console.log('[存储] session 目录不存在:', config.opencode.storageDir);
@@ -652,7 +731,7 @@ function getAllSessionsFromStorage() {
       .filter(dirent => dirent.isDirectory())
       .map(dirent => dirent.name);
 
-    console.log(`[存储] 找到 ${projectDirs.length} 个 projectID:`, projectDirs);
+    console.log(`[存储-JSON] 找到 ${projectDirs.length} 个 projectID`);
 
     for (const projectId of projectDirs) {
       const projectDir = path.join(config.opencode.storageDir, projectId);
@@ -661,24 +740,26 @@ function getAllSessionsFromStorage() {
         .filter(dirent => dirent.isFile() && dirent.name.endsWith('.json'))
         .map(dirent => dirent.name);
 
-      console.log(`[存储] projectID="${projectId}": ${sessionFiles.length} 个 session 文件`);
-
       for (const sessionFile of sessionFiles) {
         try {
           const sessionPath = path.join(projectDir, sessionFile);
           const sessionContent = fs.readFileSync(sessionPath, 'utf8');
           const sessionData = JSON.parse(sessionContent);
 
-          allSessions.push(sessionData);
+          // 避免重复（SQLite 已有的跳过）
+          if (!sessionIds.has(sessionData.id)) {
+            sessionIds.add(sessionData.id);
+            allSessions.push(sessionData);
+          }
         } catch (error) {
-          console.error(`[存储] 读取 session 文件失败: ${sessionFile}`, error.message);
+          console.error(`[存储-JSON] 读取 session 文件失败: ${sessionFile}`, error.message);
         }
       }
     }
 
-    console.log(`[存储] 总共读取 ${allSessions.length} 个 sessions`);
+    console.log(`[存储] 总计: SQLite=${sqliteSessions.length}, JSON=${allSessions.length - sqliteSessions.length}, 合并后=${allSessions.length}`);
   } catch (error) {
-    console.error('[存储] 读取 sessions 失败:', error.message);
+    console.error('[存储] 读取 JSON sessions 失败:', error.message);
   }
 
   return allSessions;
